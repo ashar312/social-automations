@@ -32,6 +32,7 @@ const schema = z.object({
   META_REDIRECT_URI: z.string().default('http://localhost:5000/api/oauth/meta/callback'),
   META_GRAPH_VERSION: z.string().default('v24.0'),
   META_WEBHOOK_VERIFY_TOKEN: opt,
+  MYSQLDUMP_PATH: opt,
 });
 
 const parsed = schema.safeParse(process.env);

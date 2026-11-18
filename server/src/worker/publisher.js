@@ -7,6 +7,7 @@ const { ensureFresh, testAccount } = require('../services/tokens');
 const { rollup } = require('../services/posts');
 const { PublishError, fromHttp } = require('../services/errors');
 const media = require('../services/media');
+const { runBackup, backupDone } = require('../services/backup');
 
 const TICK_MS = 5000;
 const MAX_CONCURRENT = 2;
@@ -125,6 +126,13 @@ async function tokenHealth() {
   }
 }
 
+// Nightly dump: runs once per day after 02:00 local time (or at startup if today's dump is missing and it is past 02:00)
+async function nightlyBackup() {
+  if (new Date().getHours() < 2 || backupDone()) return;
+  const f = await runBackup();
+  console.log('Database backup written:', f);
+}
+
 async function start() {
   await recover();
   timer = setInterval(tick, TICK_MS);
@@ -133,6 +141,8 @@ async function start() {
   setInterval(safe(cleanupMedia), 6 * 3600 * 1000);
   setInterval(safe(tokenHealth), 12 * 3600 * 1000);
   setTimeout(safe(tokenHealth), 30 * 1000);
+  setInterval(safe(nightlyBackup), 30 * 60 * 1000);
+  setTimeout(safe(nightlyBackup), 60 * 1000);
   console.log('Publisher worker started');
 }
 
