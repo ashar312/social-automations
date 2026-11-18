@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { FaFlask, FaLink, FaLinkSlash, FaRotate } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
+import { Bar, Notice, PageTitle, PlatformIcon, PLATFORM_META } from '../components/ui.jsx'
+import { useGame } from '../game/useGame.js'
 
 const CONNECT_VIA = { linkedin: 'linkedin', youtube: 'youtube', facebook: 'meta', instagram: 'meta' }
+const TOKEN_FULL_DAYS = 60
 
 function Badge({ c }) {
-  if (c.status === 'disconnected') return <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Not connected</span>
-  if (c.status === 'expired') return <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">Expired, reconnect</span>
-  if (c.status === 'error') return <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Error</span>
+  if (c.status === 'disconnected') return <span className="pill pill-mute">Not connected</span>
+  if (c.status === 'expired') return <span className="pill pill-bad">Expired, reconnect</span>
+  if (c.status === 'error') return <span className="pill pill-warn">Error</span>
   const soon = c.daysLeft != null && c.daysLeft < 7
-  return (
-    <span className={`rounded px-2 py-0.5 text-xs ${soon ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-      Connected{c.daysLeft != null ? ` · ${c.daysLeft}d left` : ' · no expiry'}
-    </span>
-  )
+  return <span className={`pill ${soon ? 'pill-warn' : 'pill-good'}`}>Connected{c.daysLeft != null ? ` · ${c.daysLeft}d left` : ' · no expiry'}</span>
 }
 
 export default function Connections() {
+  const { confirm, refresh } = useGame()
   const [list, setList] = useState([])
   const [msg, setMsg] = useState({})
   const [params, setParams] = useSearchParams()
@@ -40,55 +41,91 @@ export default function Connections() {
     load()
   }
   async function disconnect(p) {
-    if (!confirm(`Disconnect ${PLATFORM_LABEL[p]}?`)) return
+    const sure = await confirm({ title: `Disconnect ${PLATFORM_LABEL[p]}?`, body: 'You can reconnect it at any time.', confirmLabel: 'Disconnect', danger: true })
+    if (!sure) return
     await api.del(`/api/connections/${p}`)
     load()
+    refresh()
   }
   async function choose(pageId) {
     await api.post('/api/oauth/meta/select', { sel, pageId })
-    setPages(null); setParams({ connected: 'facebook,instagram' }); load()
+    setPages(null); setParams({ connected: 'facebook,instagram' }); load(); refresh()
   }
+
+  const linked = list.filter((c) => ['connected', 'error'].includes(c.status)).length
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold">Connections</h1>
-      {flash && <p className="mb-3 rounded bg-green-50 p-3 text-sm text-green-800">Connected: {flash.replace(',', ' + ')}</p>}
-      {error && <p className="mb-3 rounded bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-      {msg.meta && <p className="mb-3 rounded bg-red-50 p-3 text-sm text-red-800">{msg.meta}</p>}
+      <PageTitle eyebrow="Your party" title="Connections">
+        {list.length > 0 && (
+          <div className="w-full sm:w-56">
+            <p className="mb-1 text-right text-sm font-extrabold tabular-nums"><span className="text-xp">{linked}</span>/{list.length} linked</p>
+            <Bar pct={(linked / list.length) * 100} label="Platforms connected" />
+          </div>
+        )}
+      </PageTitle>
+
+      {(flash || error || msg.meta) && (
+        <div className="mb-4 space-y-3">
+          {flash && <Notice tone="good">Connected: {flash.replace(',', ' + ')}</Notice>}
+          {error && <Notice>{error}</Notice>}
+          {msg.meta && <Notice>{msg.meta}</Notice>}
+        </div>
+      )}
+
       {pages && (
-        <div className="mb-4 rounded border border-indigo-200 bg-indigo-50 p-4">
-          <p className="mb-2 font-medium">Which Facebook Page should be used?</p>
+        <div className="panel mb-5 p-5">
+          <p className="panel-title mb-3">Which Facebook Page should be used?</p>
           <div className="flex flex-wrap gap-2">
-            {pages.map((p) => (
-              <button key={p.id} onClick={() => choose(p.id)} className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700">{p.name}</button>
-            ))}
+            {pages.map((p) => <button key={p.id} onClick={() => choose(p.id)} className="btn btn-xp btn-sm">{p.name}</button>)}
           </div>
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {list.map((c) => {
+
+      {list.length === 0 && <div className="grid gap-5 sm:grid-cols-2" aria-label="Loading">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-52" />)}</div>}
+
+      <div className="stagger grid gap-5 sm:grid-cols-2">
+        {list.map((c, i) => {
           const connected = c.status !== 'disconnected'
+          const healthy = ['connected', 'error'].includes(c.status)
+          const color = PLATFORM_META[c.platform].color
+          const soon = c.daysLeft != null && c.daysLeft < 7
           return (
-            <div key={c.platform} className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-3">
-                  {c.avatarUrl ? <img src={c.avatarUrl} alt="" className="h-10 w-10 rounded-full" referrerPolicy="no-referrer" /> : <div className="h-10 w-10 rounded-full bg-slate-200" />}
-                  <div>
-                    <div className="font-medium">{PLATFORM_LABEL[c.platform]}</div>
-                    <div className="text-sm text-slate-500">{c.displayName || '—'}</div>
+            <div
+              key={c.platform}
+              style={{ '--i': i, '--pc': color, borderColor: healthy ? `color-mix(in srgb, ${color} 55%, var(--color-ink-700))` : undefined }}
+              className="panel panel-hover p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="relative shrink-0">
+                    <PlatformIcon platform={c.platform} size="lg" />
+                    {c.avatarUrl && <img src={c.avatarUrl} alt="" referrerPolicy="no-referrer" className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-2 border-ink-900 object-cover" />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-display text-2xl leading-tight">{PLATFORM_LABEL[c.platform]}</div>
+                    <div className="truncate text-sm text-ink-300">{c.displayName || '—'}</div>
                   </div>
                 </div>
                 <Badge c={c} />
               </div>
-              <div className="mt-4 flex flex-wrap gap-2 text-sm">
-                <a href={`/api/oauth/${CONNECT_VIA[c.platform]}/start`} className="rounded bg-indigo-600 px-3 py-1.5 text-white hover:bg-indigo-700">
-                  {connected ? 'Reconnect' : 'Connect'}
+
+              {healthy && (
+                <div className="mt-4">
+                  <p className="mb-1 text-xs font-extrabold text-ink-300">Token energy</p>
+                  <Bar pct={c.daysLeft == null ? 100 : (c.daysLeft / TOKEN_FULL_DAYS) * 100} tone={soon ? 'bad' : 'platform'} label={`${PLATFORM_LABEL[c.platform]} token energy`} />
+                </div>
+              )}
+
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                <a href={`/api/oauth/${CONNECT_VIA[c.platform]}/start`} className={`btn btn-sm ${connected ? 'btn-ghost' : 'btn-xp'}`}>
+                  {connected ? <FaRotate aria-hidden="true" /> : <FaLink aria-hidden="true" />}{connected ? 'Reconnect' : 'Connect'}
                 </a>
-                {connected && <button onClick={() => test(c.platform)} className="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-50">Test</button>}
-                {connected && <button onClick={() => disconnect(c.platform)} className="rounded border border-slate-300 px-3 py-1.5 text-red-700 hover:bg-red-50">Disconnect</button>}
+                {connected && <button onClick={() => test(c.platform)} className="btn btn-ghost btn-sm"><FaFlask aria-hidden="true" />Test</button>}
+                {connected && <button onClick={() => disconnect(c.platform)} className="btn btn-ghost btn-sm !text-coral"><FaLinkSlash aria-hidden="true" />Disconnect</button>}
               </div>
-              {msg[c.platform] && <p className="mt-2 text-sm text-slate-600">{msg[c.platform]}</p>}
-              {c.platform === 'instagram' && !connected && <p className="mt-2 text-xs text-slate-500">Connected together with Facebook (same Meta login).</p>}
+              {msg[c.platform] && <p className="mt-3 text-sm font-bold text-ink-200" role="status">{msg[c.platform]}</p>}
+              {c.platform === 'instagram' && !connected && <p className="mt-3 text-xs text-ink-300">Connected together with Facebook (same Meta login).</p>}
             </div>
           )
         })}
