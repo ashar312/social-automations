@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   FaCheck, FaClock, FaFacebookF, FaForwardStep, FaGear, FaInstagram, FaLinkedinIn, FaTriangleExclamation,
   FaUpload, FaXmark, FaYoutube,
 } from 'react-icons/fa6'
 import { PLATFORM_LABEL } from '../api.js'
-import { prefersReducedMotion } from '../game/confetti.js'
 
 export const PLATFORM_META = {
-  linkedin: { icon: FaLinkedinIn, color: '#3aa0ff' },
-  youtube: { icon: FaYoutube, color: '#ff4d4d' },
-  facebook: { icon: FaFacebookF, color: '#6f8cff' },
-  instagram: { icon: FaInstagram, color: '#ff5fae' },
+  linkedin: { icon: FaLinkedinIn, color: '#0a66c2' },
+  youtube: { icon: FaYoutube, color: '#e11d2e' },
+  facebook: { icon: FaFacebookF, color: '#1877f2' },
+  instagram: { icon: FaInstagram, color: '#d6286a' },
 }
 
 export function PlatformIcon({ platform, size = 'md' }) {
@@ -65,33 +64,13 @@ export function TargetChip({ t }) {
     : <span title={t.errorMessage || s.label} className="target-chip">{body}</span>
 }
 
-export function Bar({ pct, tone = 'xp', label, size = 'md' }) {
+export function Bar({ pct, tone = 'brand', label, size = 'md' }) {
   const value = Math.max(0, Math.min(100, pct || 0))
   return (
     <div className={`bar bar-${size}`} role="progressbar" aria-label={label} aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}>
       <div className={`bar-fill bar-${tone}`} style={{ width: `${value}%` }} />
     </div>
   )
-}
-
-export function CountUp({ value, duration = 800 }) {
-  const [shown, setShown] = useState(value)
-  const from = useRef(value)
-  useEffect(() => {
-    const start = from.current
-    from.current = value
-    if (start === value || prefersReducedMotion()) { setShown(value); return undefined }
-    const began = performance.now()
-    let raf
-    const tick = (time) => {
-      const t = Math.min(1, (time - began) / duration)
-      setShown(Math.round(start + (value - start) * (1 - (1 - t) ** 3)))
-      if (t < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [value, duration])
-  return <>{shown.toLocaleString()}</>
 }
 
 export function Notice({ tone = 'bad', children }) {
@@ -105,10 +84,10 @@ export function Notice({ tone = 'bad', children }) {
 
 export function PageTitle({ eyebrow, title, children }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 className="font-display text-4xl leading-none sm:text-5xl">{title}</h1>
+        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+        <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">{title}</h1>
       </div>
       {children}
     </div>
@@ -126,11 +105,11 @@ export function Modal({ label, onClose, children }) {
     <dialog
       ref={ref}
       aria-label={label}
-      className="game-modal"
+      className="modal"
       onCancel={(e) => { e.preventDefault(); onClose() }}
       onClick={(e) => { if (e.target === ref.current) onClose() }}
     >
-      <div className="game-modal-body">{children}</div>
+      <div className="modal-body">{children}</div>
     </dialog>
   )
 }

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { FaFlask, FaLink, FaLinkSlash, FaRotate } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
 import { Bar, Notice, PageTitle, PlatformIcon, PLATFORM_META } from '../components/ui.jsx'
-import { useGame } from '../game/useGame.js'
+import { useConfirm } from '../components/useConfirm.js'
 import { useProject } from '../projects/useProject.js'
 
 const CONNECT_VIA = { linkedin: 'linkedin', youtube: 'youtube', facebook: 'meta', instagram: 'meta' }
@@ -18,7 +18,7 @@ function Badge({ c }) {
 }
 
 export default function Connections() {
-  const { confirm, refresh } = useGame()
+  const confirm = useConfirm()
   const { active, projectApi, reload: reloadProjects } = useProject()
   const [list, setList] = useState([])
   const [msg, setMsg] = useState({})
@@ -41,7 +41,7 @@ export default function Connections() {
   }, [params, sel])
   async function chooseLinkedin(id) {
     await api.post('/api/oauth/linkedin/select', { sel, id })
-    setLiAccounts(null); setParams({ connected: 'linkedin' }); load(); refresh(); reloadProjects()
+    setLiAccounts(null); setParams({ connected: 'linkedin' }); load(); reloadProjects()
   }
 
   async function test(p) {
@@ -55,22 +55,21 @@ export default function Connections() {
     if (!sure) return
     await api.del(projectApi(`/connections/${p}`))
     load()
-    refresh()
     reloadProjects()
   }
   async function choose(pageId) {
     await api.post('/api/oauth/meta/select', { sel, pageId })
-    setPages(null); setParams({ connected: 'facebook,instagram' }); load(); refresh(); reloadProjects()
+    setPages(null); setParams({ connected: 'facebook,instagram' }); load(); reloadProjects()
   }
 
   const linked = list.filter((c) => ['connected', 'error'].includes(c.status)).length
 
   return (
     <div>
-      <PageTitle eyebrow={`Your party · ${active.name}`} title="Connections">
+      <PageTitle eyebrow={active.name} title="Connections">
         {list.length > 0 && (
           <div className="w-full sm:w-56">
-            <p className="mb-1 text-right text-sm font-extrabold tabular-nums"><span className="text-xp">{linked}</span>/{list.length} linked</p>
+            <p className="mb-1.5 text-right text-sm font-medium tabular-nums text-body"><span className="font-semibold text-ink">{linked}</span> of {list.length} connected</p>
             <Bar pct={(linked / list.length) * 100} label="Platforms connected" />
           </div>
         )}
@@ -85,19 +84,19 @@ export default function Connections() {
       )}
 
       {pages && (
-        <div className="panel mb-5 p-5">
-          <p className="panel-title mb-3">Which Facebook Page should be used?</p>
+        <div className="card mb-5 p-5">
+          <p className="card-title mb-3">Which Facebook Page should be used?</p>
           <div className="flex flex-wrap gap-2">
-            {pages.map((p) => <button key={p.id} onClick={() => choose(p.id)} className="btn btn-xp btn-sm">{p.name}{p.usedIn?.length > 0 && <span className="text-xs font-bold opacity-70"> · also in {p.usedIn.join(', ')}</span>}</button>)}
+            {pages.map((p) => <button key={p.id} onClick={() => choose(p.id)} className="btn btn-sm">{p.name}{p.usedIn?.length > 0 && <span className="text-xs font-normal text-muted"> · also in {p.usedIn.join(', ')}</span>}</button>)}
           </div>
         </div>
       )}
 
       {liAccounts && (
-        <div className="panel mb-5 p-5">
-          <p className="panel-title mb-3">Post to LinkedIn as…</p>
+        <div className="card mb-5 p-5">
+          <p className="card-title mb-3">Post to LinkedIn as…</p>
           <div className="flex flex-wrap gap-2">
-            {liAccounts.map((a) => <button key={a.id} onClick={() => chooseLinkedin(a.id)} className="btn btn-xp btn-sm">{a.name}</button>)}
+            {liAccounts.map((a) => <button key={a.id} onClick={() => chooseLinkedin(a.id)} className="btn btn-sm">{a.name}</button>)}
           </div>
         </div>
       )}
@@ -113,18 +112,18 @@ export default function Connections() {
           return (
             <div
               key={c.platform}
-              style={{ '--i': i, '--pc': color, borderColor: healthy ? `color-mix(in srgb, ${color} 55%, var(--color-ink-700))` : undefined }}
-              className="panel panel-hover p-5"
+              style={{ '--i': i, '--pc': color, borderColor: healthy ? `color-mix(in srgb, ${color} 35%, var(--color-line))` : undefined }}
+              className="card card-hover p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="relative shrink-0">
                     <PlatformIcon platform={c.platform} size="lg" />
-                    {c.avatarUrl && <img src={c.avatarUrl} alt="" referrerPolicy="no-referrer" className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-2 border-ink-900 object-cover" />}
+                    {c.avatarUrl && <img src={c.avatarUrl} alt="" referrerPolicy="no-referrer" className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full border-2 border-white object-cover" />}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-display text-2xl leading-tight">{PLATFORM_LABEL[c.platform]}</div>
-                    <div className="truncate text-sm text-ink-300">{c.displayName || '—'}</div>
+                    <div className="text-lg font-semibold leading-tight text-ink">{PLATFORM_LABEL[c.platform]}</div>
+                    <div className="truncate text-sm text-muted">{c.displayName || '—'}</div>
                     {c.sharedWith?.length > 0 && <span className="pill pill-mute mt-1">Shared with: {c.sharedWith.join(', ')}</span>}
                   </div>
                 </div>
@@ -133,20 +132,20 @@ export default function Connections() {
 
               {healthy && (
                 <div className="mt-4">
-                  <p className="mb-1 text-xs font-extrabold text-ink-300">Token energy</p>
-                  <Bar pct={c.daysLeft == null ? 100 : (c.daysLeft / TOKEN_FULL_DAYS) * 100} tone={soon ? 'bad' : 'platform'} label={`${PLATFORM_LABEL[c.platform]} token energy`} />
+                  <p className="mb-1 text-xs font-semibold text-muted">Token validity</p>
+                  <Bar pct={c.daysLeft == null ? 100 : (c.daysLeft / TOKEN_FULL_DAYS) * 100} tone={soon ? 'bad' : 'platform'} label={`${PLATFORM_LABEL[c.platform]} token validity`} />
                 </div>
               )}
 
               <div className="mt-5 flex flex-wrap gap-2.5">
-                <a href={`/api/oauth/${CONNECT_VIA[c.platform]}/start?project=${active.id}`} className={`btn btn-sm ${connected ? 'btn-ghost' : 'btn-xp'}`}>
+                <a href={`/api/oauth/${CONNECT_VIA[c.platform]}/start?project=${active.id}`} className={`btn btn-sm ${connected ? '' : 'btn-primary'}`}>
                   {connected ? <FaRotate aria-hidden="true" /> : <FaLink aria-hidden="true" />}{connected ? 'Reconnect' : 'Connect'}
                 </a>
-                {connected && <button onClick={() => test(c.platform)} className="btn btn-ghost btn-sm"><FaFlask aria-hidden="true" />Test</button>}
-                {connected && <button onClick={() => disconnect(c.platform)} className="btn btn-ghost btn-sm !text-coral"><FaLinkSlash aria-hidden="true" />Disconnect</button>}
+                {connected && <button onClick={() => test(c.platform)} className="btn btn-sm"><FaFlask aria-hidden="true" />Test</button>}
+                {connected && <button onClick={() => disconnect(c.platform)} className="btn btn-danger btn-sm"><FaLinkSlash aria-hidden="true" />Disconnect</button>}
               </div>
-              {msg[c.platform] && <p className="mt-3 text-sm font-bold text-ink-200" role="status">{msg[c.platform]}</p>}
-              {c.platform === 'instagram' && !connected && <p className="mt-3 text-xs text-ink-300">Connected together with Facebook (same Meta login).</p>}
+              {msg[c.platform] && <p className="mt-3 text-sm font-medium text-body" role="status">{msg[c.platform]}</p>}
+              {c.platform === 'instagram' && !connected && <p className="mt-3 text-xs text-muted">Connected together with Facebook (same Meta login).</p>}
             </div>
           )
         })}

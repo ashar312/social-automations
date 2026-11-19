@@ -48,10 +48,10 @@ export function ProjectProvider({ children }) {
   if (!projects.length) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16">
-        <div className="panel p-6">
-          <FaFolderPlus className="mb-3 text-4xl text-xp" aria-hidden="true" />
-          <h1 className="font-display text-3xl">Create your first project</h1>
-          <p className="mb-5 mt-1 text-sm text-ink-300">A project is one channel or brand, with its own LinkedIn, YouTube, Facebook and Instagram connections.</p>
+        <div className="card p-6">
+          <span className="stat-icon mb-4 !h-11 !w-11 !text-lg"><FaFolderPlus aria-hidden="true" /></span>
+          <h1 className="text-2xl font-semibold">Create your first project</h1>
+          <p className="mb-5 mt-1 text-sm text-muted">A project is one channel or brand, with its own LinkedIn, YouTube, Facebook and Instagram connections.</p>
           <ProjectForm submitLabel="Create project" onDone={async (p) => { setActive(p.id); await reload() }} />
         </div>
       </div>

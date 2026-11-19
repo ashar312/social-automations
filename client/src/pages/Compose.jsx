@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaBolt, FaCalendarDays, FaCheck, FaCloudArrowUp, FaRocket, FaXmark } from 'react-icons/fa6'
+import { FaCalendarDays, FaCheck, FaCloudArrowUp, FaPaperPlane, FaXmark } from 'react-icons/fa6'
 import { api, uploadMedia, PLATFORMS, PLATFORM_LABEL } from '../api.js'
-import { Bar, CountUp, Notice, PageTitle, PlatformIcon, PLATFORM_META } from '../components/ui.jsx'
-import { prefersReducedMotion } from '../game/confetti.js'
-import { previewXp } from '../game/engine.js'
+import { Bar, Notice, PageTitle, PlatformIcon, PLATFORM_META } from '../components/ui.jsx'
 import { useProject } from '../projects/useProject.js'
 
 const LIMITS = { linkedin: 3000, instagram: 2200, youtube: 5000, facebook: null }
-const LAUNCH_MS = 950
 
 function suggestType(media) {
   if (!media.length) return 'text'
@@ -23,7 +20,6 @@ export default function Compose() {
   const [also, setAlso] = useState(new Set())
   const [crossResult, setCrossResult] = useState(null)
   const fileRef = useRef(null)
-  const launchTimer = useRef(null)
   const [media, setMedia] = useState([])
   const [uploads, setUploads] = useState([]) // {name, pct, error}
   const [contentType, setContentType] = useState('text')
@@ -40,9 +36,6 @@ export default function Compose() {
   const [error, setError] = useState('')
   const [drag, setDrag] = useState(false)
   const [schedule, setSchedule] = useState('')
-  const [launching, setLaunching] = useState(false)
-
-  useEffect(() => () => clearTimeout(launchTimer.current), [])
 
   useEffect(() => {
     api.get(projectApi('/connections')).then((d) => setConns(Object.fromEntries(d.connections.map((c) => [c.platform, c])))).catch(() => {})
@@ -112,11 +105,7 @@ export default function Compose() {
       })
       const failed = (r.also || []).filter((a) => !a.ok)
       if (failed.length) { setCrossResult({ id: r.id, failed, done: r.also.filter((a) => a.ok) }); return }
-      if (prefersReducedMotion()) nav(`/history/${r.id}`)
-      else {
-        setLaunching(true)
-        launchTimer.current = setTimeout(() => nav(`/history/${r.id}`), LAUNCH_MS)
-      }
+      nav(`/history/${r.id}`)
     } catch (e) {
       setError(e.message)
       if (e.data?.results) setResults(e.data.results)
@@ -128,20 +117,19 @@ export default function Compose() {
   const uploading = uploads.some((u) => !u.error)
   const checks = [
     { label: 'Add content', done: caption.trim().length > 0 || media.length > 0 },
-    { label: 'Pick a platform', done: selected.length > 0 },
+    { label: 'Choose a platform', done: selected.length > 0 },
     { label: 'Clear errors', done: selected.length > 0 && blockers.length === 0 },
     { label: 'Finish uploads', done: !uploading },
   ]
   const readiness = (checks.filter((c) => c.done).length / checks.length) * 100
-  const reward = previewXp(contentType, selected.length)
 
   return (
     <div>
-      <PageTitle eyebrow="New mission" title="Compose" />
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_350px]">
+      <PageTitle eyebrow={active.name} title="Compose" />
+      <div className="grid items-start gap-6 xl:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-5">
-          <section className="panel p-4 sm:p-5">
-            <h2 className="panel-title mb-3"><span className="step-num">1</span>Load your media</h2>
+          <section className="card p-5">
+            <h2 className="card-title mb-4 flex items-center gap-2.5"><span className="step-num">1</span>Media</h2>
             <button
               type="button"
               onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
@@ -151,8 +139,8 @@ export default function Compose() {
               className={`dropzone ${drag ? 'dropzone-on' : ''}`}
             >
               <span className="dropzone-icon"><FaCloudArrowUp aria-hidden="true" /></span>
-              <span className="mt-2 block font-extrabold">Drop an image or video here, or click to choose</span>
-              <span className="block text-xs text-ink-300">Leave empty for a text-only post</span>
+              <span className="mt-2 block font-semibold">Drop an image or video here, or click to choose</span>
+              <span className="block text-xs text-muted">Leave empty for a text-only post</span>
             </button>
             <input ref={fileRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.mov" hidden onChange={(e) => { addFiles([...e.target.files]); e.target.value = '' }} />
 
@@ -160,7 +148,7 @@ export default function Compose() {
               <div className="mt-3 space-y-2.5">
                 {uploads.map((u) => (
                   <div key={u.id} className="text-sm">
-                    <div className="mb-1 flex justify-between gap-3 font-bold"><span className="truncate">{u.name}</span><span className="tabular-nums text-xp">{u.error ? '' : `${u.pct}%`}</span></div>
+                    <div className="mb-1 flex justify-between gap-3 font-medium"><span className="truncate">{u.name}</span><span className="tabular-nums text-brand-strong">{u.error ? '' : `${u.pct}%`}</span></div>
                     {u.error ? <Notice>{u.error}</Notice> : <Bar pct={u.pct} label={`Uploading ${u.name}`} />}
                   </div>
                 ))}
@@ -172,21 +160,21 @@ export default function Compose() {
                 {media.map((m) => (
                   <div key={m.id} className="relative">
                     {m.kind === 'video' && media.length === 1
-                      ? <video src={`/api/media/${m.id}/file`} controls className="max-h-72 rounded-xl" />
-                      : <img src={`/api/media/${m.id}/thumb`} alt={m.name} className="h-32 rounded-xl" />}
-                    <button onClick={() => setMedia((c) => c.filter((x) => x.id !== m.id))} aria-label={`Remove ${m.name || 'media'}`} className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-coral text-xs text-[#2c0610] shadow-[0_2px_0_var(--color-coral-deep)] transition-transform hover:scale-110"><FaXmark aria-hidden="true" /></button>
+                      ? <video src={`/api/media/${m.id}/file`} controls className="max-h-72 rounded-xl border border-line" />
+                      : <img src={`/api/media/${m.id}/thumb`} alt={m.name} className="h-32 rounded-xl border border-line object-cover" />}
+                    <button onClick={() => setMedia((c) => c.filter((x) => x.id !== m.id))} aria-label={`Remove ${m.name || 'media'}`} className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-line-strong bg-surface text-[0.65rem] text-body shadow-card transition-colors hover:bg-bad hover:text-white"><FaXmark aria-hidden="true" /></button>
                   </div>
                 ))}
               </div>
             )}
             {primary && (
-              <p className="mt-2 text-xs text-ink-300">
+              <p className="mt-2 text-xs text-muted">
                 {primary.kind} · {primary.width}×{primary.height}{primary.duration != null ? ` · ${primary.duration.toFixed(1)}s` : ''} · {(primary.size / 1048576).toFixed(1)} MB
               </p>
             )}
 
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-              <label htmlFor="content-type" className="font-extrabold text-ink-200">Content type</label>
+              <label htmlFor="content-type" className="font-semibold text-body">Content type</label>
               <select id="content-type" value={contentType} onChange={(e) => { setContentType(e.target.value); setTypeTouched(true) }} className="field !w-auto !py-1.5">
                 <option value="text">Text</option><option value="image">Image(s)</option><option value="video">Video</option><option value="reel">Reel / Short</option>
               </select>
@@ -194,9 +182,9 @@ export default function Compose() {
             </div>
           </section>
 
-          <section className="panel p-4 sm:p-5">
-            <h2 className="panel-title mb-3"><span className="step-num">2</span>Write your message</h2>
-            <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-ink-950 p-1" role="tablist" aria-label="Caption version">
+          <section className="card p-5">
+            <h2 className="card-title mb-4 flex items-center gap-2.5"><span className="step-num">2</span>Message</h2>
+            <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl bg-sunken p-1" role="tablist" aria-label="Caption version">
               {['default', ...PLATFORMS].map((t) => (
                 <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="tab-btn">
                   {t !== 'default' && <PlatformIcon platform={t} size="xs" />}
@@ -209,13 +197,13 @@ export default function Compose() {
               <div className="space-y-4">
                 <div>
                   <label htmlFor="caption" className="label">Caption (used everywhere unless overridden)</label>
-                  <textarea id="caption" value={caption} onChange={(e) => setCaption(e.target.value)} rows={6} placeholder="What are we launching today?" className="field resize-y" />
+                  <textarea id="caption" value={caption} onChange={(e) => setCaption(e.target.value)} rows={6} placeholder="What do you want to share?" className="field resize-y" />
                   <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     {PLATFORMS.filter((p) => LIMITS[p]).map((p) => {
                       const over = capFor(p).length > LIMITS[p]
                       return (
                         <div key={p} style={{ '--pc': PLATFORM_META[p].color }}>
-                          <div className={`mb-1 flex justify-between gap-2 text-[0.7rem] font-extrabold tabular-nums ${over ? 'text-coral' : 'text-ink-300'}`}>
+                          <div className={`mb-1 flex justify-between gap-2 text-[0.7rem] font-semibold tabular-nums ${over ? 'text-bad' : 'text-muted'}`}>
                             <span>{PLATFORM_LABEL[p]}</span><span>{capFor(p).length}/{LIMITS[p]}</span>
                           </div>
                           <Bar pct={(capFor(p).length / LIMITS[p]) * 100} tone={over ? 'bad' : 'platform'} size="sm" label={`${PLATFORM_LABEL[p]} caption length`} />
@@ -239,18 +227,18 @@ export default function Compose() {
                   <>
                     <input aria-label="Title override" placeholder="Title override" value={overrides.youtube.title || ''} onChange={(e) => setOv('youtube', 'title', e.target.value)} className="field" />
                     <div className="flex flex-wrap items-center gap-3 text-sm">
-                      <label htmlFor="privacy" className="font-extrabold text-ink-200">Privacy</label>
+                      <label htmlFor="privacy" className="font-semibold text-body">Privacy</label>
                       <select id="privacy" value={overrides.youtube.privacy} onChange={(e) => setOv('youtube', 'privacy', e.target.value)} className="field !w-auto !py-1.5">
                         <option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option>
                       </select>
-                      {config.youtubeAudited === false && <span className="text-xs font-bold text-gold">Audit not passed: uploads will be private</span>}
+                      {config.youtubeAudited === false && <span className="text-xs font-medium text-warn">Audit not passed: uploads will be private</span>}
                     </div>
                     <input aria-label="Tags" placeholder="Tags (comma separated)" value={overrides.youtube.tags || ''} onChange={(e) => setOv('youtube', 'tags', e.target.value)} className="field" />
                   </>
                 )}
                 {tab === 'instagram' && (
-                  <label className="flex items-center gap-2 text-sm font-bold">
-                    <input type="checkbox" className="h-4 w-4 accent-[#b6f427]" checked={overrides.instagram.shareToFeed !== false} onChange={(e) => setOv('instagram', 'shareToFeed', e.target.checked)} /> Also share Reel to feed
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input type="checkbox" className="h-4 w-4 accent-[#5b5bf0]" checked={overrides.instagram.shareToFeed !== false} onChange={(e) => setOv('instagram', 'shareToFeed', e.target.checked)} /> Also share Reel to feed
                   </label>
                 )}
               </div>
@@ -259,8 +247,8 @@ export default function Compose() {
         </div>
 
         <aside className="min-w-0 space-y-5">
-          <section className="panel p-4">
-            <h2 className="panel-title mb-3"><span className="step-num">3</span>Choose your targets</h2>
+          <section className="card p-5">
+            <h2 className="card-title mb-4 flex items-center gap-2.5"><span className="step-num">3</span>Platforms</h2>
             <ul className="space-y-2">
               {PLATFORMS.map((p) => {
                 const r = results[p]
@@ -273,87 +261,79 @@ export default function Compose() {
                       <input type="checkbox" className="sr-only" disabled={!ok} checked={on} onChange={(e) => setDeselected((s) => { const n = new Set(s); e.target.checked ? n.delete(p) : n.add(p); return n })} />
                       <PlatformIcon platform={p} size="sm" />
                       <span className="min-w-0">
-                        <span className="block font-extrabold leading-tight">{PLATFORM_LABEL[p]}</span>
-                        {why && <span className="block text-xs leading-tight text-ink-300">{why}</span>}
+                        <span className="block font-semibold leading-tight">{PLATFORM_LABEL[p]}</span>
+                        {why && <span className="block text-xs leading-tight text-muted">{why}</span>}
                       </span>
                       <span className="check-box"><FaCheck aria-hidden="true" /></span>
                     </label>
-                    {on && r?.errors.map((e, i) => <p key={i} className="ml-2 mt-1 text-xs font-bold text-coral">{e}</p>)}
-                    {on && r?.warnings.map((e, i) => <p key={i} className="ml-2 mt-1 text-xs font-bold text-gold">{e}</p>)}
+                    {on && r?.errors.map((e, i) => <p key={i} className="ml-2 mt-1 text-xs font-medium text-bad">{e}</p>)}
+                    {on && r?.warnings.map((e, i) => <p key={i} className="ml-2 mt-1 text-xs font-medium text-warn">{e}</p>)}
                   </li>
                 )
               })}
             </ul>
           </section>
 
-          <section className="panel p-4">
-            <label htmlFor="schedule" className="label flex items-center gap-2"><FaCalendarDays className="text-grape" aria-hidden="true" />Schedule (optional)</label>
+          <section className="card p-5">
+            <label htmlFor="schedule" className="label flex items-center gap-2"><FaCalendarDays className="text-brand" aria-hidden="true" />Schedule (optional)</label>
             <input id="schedule" type="datetime-local" value={schedule} onChange={(e) => setSchedule(e.target.value)} className="field" />
           </section>
 
-          <section className="panel space-y-3.5 p-4">
+          <section className="card space-y-4 p-5">
             <div>
-              <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-sm font-extrabold">Launch readiness</span>
-                <span className="font-display text-lg tabular-nums text-xp"><CountUp value={readiness} duration={400} />%</span>
+              <div className="mb-2 flex items-baseline justify-between">
+                <span className="text-sm font-semibold text-ink">Readiness</span>
+                <span className="text-sm font-semibold tabular-nums text-brand-strong">{Math.round(readiness)}%</span>
               </div>
-              <Bar pct={readiness} label="Launch readiness" />
-              <ul className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-1 text-xs font-bold">
+              <Bar pct={readiness} label="Readiness" />
+              <ul className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-1 text-xs font-medium">
                 {checks.map((c) => (
-                  <li key={c.label} className={`flex items-center gap-1.5 ${c.done ? 'text-xp' : 'text-ink-300'}`}>
-                    {c.done ? <FaCheck aria-hidden="true" /> : <span className="ml-0.5 inline-block h-2 w-2 rounded-full bg-ink-600" aria-hidden="true" />}{c.label}
+                  <li key={c.label} className={`flex items-center gap-1.5 ${c.done ? 'text-good' : 'text-muted'}`}>
+                    {c.done ? <FaCheck aria-hidden="true" /> : <span className="ml-0.5 inline-block h-2 w-2 rounded-full bg-line-strong" aria-hidden="true" />}{c.label}
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="xp-preview">
-              <span className="flex items-center gap-2 text-sm font-extrabold">
-                Reward{selected.length > 1 && <span key={selected.length} className="combo-tag">{selected.length}x combo</span>}
-              </span>
-              <span className="xp-tag !text-2xl"><FaBolt className="text-base" aria-hidden="true" />+<CountUp value={reward} duration={350} /> XP</span>
-            </div>
-
             {error && <Notice>{error}</Notice>}
             {(active.settings?.captionFooter || active.settings?.hashtags) && (
-              <p className="text-xs text-ink-300">Added to every caption: {[active.settings.captionFooter, active.settings.hashtags].filter(Boolean).join(' · ')}</p>
+              <p className="text-xs text-muted">Added to every caption: {[active.settings.captionFooter, active.settings.hashtags].filter(Boolean).join(' · ')}</p>
             )}
             {projects.filter((p) => !p.archived && p.id !== active.id).length > 0 && (
               <fieldset>
-                <legend className="text-sm font-extrabold">Also publish to</legend>
+                <legend className="text-sm font-semibold">Also publish to</legend>
                 <div className="mt-1 space-y-1">
                   {projects.filter((p) => !p.archived && p.id !== active.id).map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 text-sm font-bold">
+                    <label key={p.id} className="flex items-center gap-2 text-sm font-medium">
                       <input type="checkbox" checked={also.has(p.id)} onChange={() => setAlso((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n })} />
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} aria-hidden="true" />{p.name}
                     </label>
                   ))}
                 </div>
-                {also.size > 0 && <p className="mt-1 text-xs text-ink-300">Creates a separate post in each project, using only the platforms connected there.</p>}
+                {also.size > 0 && <p className="mt-1 text-xs text-muted">Creates a separate post in each project, using only the platforms connected there.</p>}
               </fieldset>
             )}
             {crossResult && (
               <Notice tone="warn">
                 <p>Posted to {active.name}{crossResult.done.length ? ` and ${crossResult.done.map((d) => d.projectName).join(', ')}` : ''}, but skipped: {crossResult.failed.map((f) => `${f.projectName} (${f.error})`).join('; ')}.</p>
-                <button onClick={() => nav(`/history/${crossResult.id}`)} className="mt-1 font-black underline">View post</button>
+                <button onClick={() => nav(`/history/${crossResult.id}`)} className="mt-1 font-semibold underline">View post</button>
               </Notice>
             )}
-            <p className="flex items-center gap-2 text-sm font-bold text-ink-200">
+            <p className="flex items-center gap-2 text-sm font-medium text-body">
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: active.color }} aria-hidden="true" />Publishing to <strong>{active.name}</strong>
             </p>
             <button
               onClick={publish}
               disabled={busy || !selected.length || blockers.length > 0 || uploading}
-              className="btn btn-xp btn-launch"
+              className="btn btn-primary btn-lg"
             >
-              <FaRocket aria-hidden="true" />
+              <FaPaperPlane aria-hidden="true" />
               {busy ? 'Submitting…' : schedule ? 'Schedule' : `Publish to ${selected.length} platform${selected.length === 1 ? '' : 's'}`}
             </button>
           </section>
         </aside>
       </div>
 
-      {launching && <div className="launch-overlay" role="status" aria-label="Launching your post"><FaRocket className="launch-rocket" aria-hidden="true" /></div>}
     </div>
   )
 }

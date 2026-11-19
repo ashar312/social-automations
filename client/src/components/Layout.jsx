@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom'
-import { FaChevronDown, FaClockRotateLeft, FaFire, FaFolder, FaPenNib, FaPlug, FaTrophy } from 'react-icons/fa6'
+import { FaCheck, FaChevronDown, FaClockRotateLeft, FaFolder, FaPenNib, FaPlug, FaPlus, FaTableCellsLarge } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
-import { useGame } from '../game/useGame.js'
 import { useProject } from '../projects/useProject.js'
-import { Bar, CountUp, Notice } from './ui.jsx'
+import { Notice } from './ui.jsx'
 
 const links = [
+  ['/overview', 'Overview', FaTableCellsLarge],
   ['/compose', 'Compose', FaPenNib],
-  ['/quests', 'Quests', FaTrophy],
   ['/history', 'History', FaClockRotateLeft],
   ['/connections', 'Connections', FaPlug],
   ['/projects', 'Projects', FaFolder],
@@ -45,26 +44,31 @@ function ProjectSwitcher() {
   }, [open])
   const go = (fn) => { setOpen(false); fn() }
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative min-w-0">
       <button onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open} aria-label={`Active project: ${active.name}`}
-        className="btn btn-ghost btn-sm max-w-44" style={{ borderColor: active.color }}>
-        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: active.color }} aria-hidden="true" />
-        <span className="truncate">{active.icon} {active.name}</span>
-        <FaChevronDown className="shrink-0 text-xs" aria-hidden="true" />
+        className="flex w-full items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2 text-left shadow-card transition-colors hover:border-line-strong">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-sm text-white" style={{ background: active.color }} aria-hidden="true">{active.icon || active.name.charAt(0).toUpperCase()}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[0.68rem] font-medium leading-none text-muted">Project</span>
+          <span className="mt-0.5 block truncate text-sm font-semibold leading-tight text-ink">{active.name}</span>
+        </span>
+        <FaChevronDown className="shrink-0 text-[0.65rem] text-muted" aria-hidden="true" />
       </button>
       {open && (
-        <ul role="listbox" aria-label="Projects" className="panel absolute left-0 top-full z-50 mt-2 w-64 space-y-1 p-2">
+        <ul role="listbox" aria-label="Projects" className="card absolute left-0 right-0 top-full z-50 mt-2 min-w-56 space-y-0.5 p-1.5 shadow-lift">
           {projects.filter((p) => !p.archived).map((p) => (
             <li key={p.id} role="option" aria-selected={p.id === active.id}>
-              <button onClick={() => go(() => setActive(p.id))} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-extrabold hover:bg-ink-800">
+              <button onClick={() => go(() => setActive(p.id))} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink hover:bg-sunken">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: p.color }} aria-hidden="true" />
-                <span className="truncate">{p.icon} {p.name}</span>
-                {p.id === active.id && <span className="ml-auto text-xp">✓</span>}
+                <span className="truncate">{p.name}</span>
+                {p.id === active.id && <FaCheck className="ml-auto shrink-0 text-xs text-brand" aria-hidden="true" />}
               </button>
             </li>
           ))}
-          <li className="border-t-2 border-ink-800 pt-1">
-            <button onClick={() => go(() => nav('/projects'))} className="w-full rounded-lg px-2.5 py-2 text-left text-sm font-extrabold hover:bg-ink-800">＋ New / manage projects</button>
+          <li className="mt-1 border-t border-line pt-1">
+            <button onClick={() => go(() => nav('/projects'))} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-muted hover:bg-sunken hover:text-ink">
+              <FaPlus className="text-xs" aria-hidden="true" />New / manage projects
+            </button>
           </li>
         </ul>
       )}
@@ -72,26 +76,12 @@ function ProjectSwitcher() {
   )
 }
 
-function PlayerHud() {
-  const { stats } = useGame()
-  if (!stats) return <div className="skeleton h-11 w-44" aria-hidden="true" />
-  const streakLabel = `${stats.streak} day streak${stats.streak && !stats.postedToday ? ', post today to keep it' : ''}`
+function Brand() {
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      <span className={`streak ${stats.streak ? 'streak-on' : ''}`} title={streakLabel} aria-label={streakLabel}>
-        <FaFire aria-hidden="true" />{stats.streak}
-      </span>
-      <Link to="/quests" className="flex min-w-0 items-center gap-2 rounded-xl" aria-label={`Level ${stats.level}, ${stats.title}, ${stats.xp} XP`}>
-        <span className="level-gem">{stats.level}</span>
-        <span className="hidden w-36 sm:block">
-          <span className="flex items-baseline justify-between gap-2 text-[0.7rem] font-extrabold">
-            <span className="truncate text-ink-100">{stats.title}</span>
-            <span className="shrink-0 tabular-nums text-xp"><CountUp value={stats.into} />/{stats.needed}</span>
-          </span>
-          <span className="mt-1 block"><Bar pct={stats.pct} size="sm" label="Progress to next level" /></span>
-        </span>
-      </Link>
-    </div>
+    <Link to="/overview" className="flex items-center gap-2.5" aria-label="Social Automations home">
+      <img src="/logo.svg" alt="" className="h-8 w-8" />
+      <span className="text-[0.95rem] font-semibold tracking-tight text-ink">Social Automations</span>
+    </Link>
   )
 }
 
@@ -101,39 +91,38 @@ export default function Layout() {
   const nav = useNavigate()
   const hasError = alerts.some((a) => a.level === 'error')
   return (
-    <div className="min-h-screen pb-24 md:pb-10">
-      <header className="sticky top-0 z-40 border-b-2 border-ink-800 bg-ink-950/85 backdrop-blur-md">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5" aria-label="Main">
-          <Link to="/compose" className="flex items-center gap-2.5" aria-label="Social Automations home">
-            <img src="/logo.svg" alt="" className="h-10 w-10" />
-            <span className="hidden font-display text-lg leading-none lg:block">Social<br /><span className="text-xp">Automations</span></span>
-          </Link>
-          <ProjectSwitcher />
-          <div className="hidden items-center gap-1 md:flex">
-            {links.map(([to, label, Icon]) => (
-              <NavLink key={to} to={to} className="nav-link"><Icon aria-hidden="true" />{label}</NavLink>
-            ))}
-          </div>
-          <PlayerHud />
+    <div className="min-h-screen pb-20 lg:pb-0 lg:pl-64">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col gap-6 border-r border-line bg-surface/80 px-4 py-5 backdrop-blur-md lg:flex">
+        <Brand />
+        <ProjectSwitcher />
+        <nav className="flex flex-col gap-0.5" aria-label="Main">
+          {links.map(([to, label, Icon]) => (
+            <NavLink key={to} to={to} className="nav-item"><Icon aria-hidden="true" />{label}</NavLink>
+          ))}
         </nav>
+      </aside>
+
+      <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 py-2.5 backdrop-blur-md lg:hidden">
+        <Brand />
+        <div className="w-44"><ProjectSwitcher /></div>
       </header>
 
       {alerts.length > 0 && (
-        <div className="mx-auto mt-4 max-w-6xl px-4">
+        <div className="mx-auto mt-5 max-w-5xl px-4 sm:px-8">
           <Notice tone={hasError ? 'bad' : 'warn'}>
             <span className="flex flex-wrap items-center justify-between gap-2">
               <span>{alerts.map((a) => a.text).join(' · ')}</span>
-              <button onClick={() => { setActive(alerts[0].projectId); nav('/connections') }} className="font-black underline">Reconnect</button>
+              <button onClick={() => { setActive(alerts[0].projectId); nav('/connections') }} className="font-semibold underline">Reconnect</button>
             </span>
           </Notice>
         </div>
       )}
 
-      <main key={active.id} className="page-in mx-auto max-w-6xl px-4 py-7">
+      <main key={active.id} className="page-in mx-auto max-w-5xl px-4 py-8 sm:px-8 lg:py-10">
         <Outlet />
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex gap-1 border-t-2 border-ink-800 bg-ink-950/95 px-2 py-1 backdrop-blur-md md:hidden" aria-label="Main mobile">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex gap-1 border-t border-line bg-surface/95 px-2 py-1 backdrop-blur-md lg:hidden" aria-label="Main mobile">
         {links.map(([to, label, Icon]) => (
           <NavLink key={to} to={to} className="tab-link"><Icon aria-hidden="true" />{label}</NavLink>
         ))}
