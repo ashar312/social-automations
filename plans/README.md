@@ -32,6 +32,7 @@ No logins and no multi-user support. It runs on `localhost` for your own use.
 | [guides/meta-instagram-facebook-setup.md](guides/meta-instagram-facebook-setup.md) | Step-by-step Meta app, Facebook Page and Instagram setup |
 | [guides/public-media-url.md](guides/public-media-url.md) | Exposing local media over HTTPS, which Instagram requires |
 | [guides/webhooks.md](guides/webhooks.md) | Which webhooks exist, and which ones are worth setting up |
+| [guides/api.md](guides/api.md) | External API: let other systems post through a project using its project ID + API key |
 
 ## Suggested order
 

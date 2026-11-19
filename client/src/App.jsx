@@ -6,6 +6,7 @@ import PostDetail from './pages/PostDetail.jsx'
 import Connections from './pages/Connections.jsx'
 import Overview from './pages/Overview.jsx'
 import Projects from './pages/Projects.jsx'
+import Integration from './pages/Integration.jsx'
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="history/:id" element={<PostDetail />} />
         <Route path="connections" element={<Connections />} />
         <Route path="projects" element={<Projects />} />
+        <Route path="integration" element={<Integration />} />
       </Route>
     </Routes>
   )

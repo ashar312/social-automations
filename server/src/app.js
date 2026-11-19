@@ -8,27 +8,47 @@ const { router: mediaRouter, publicRouter } = require('./routes/media');
 
 const app = express();
 
+const isApi = (p) => p === '/api/v1' || p.startsWith('/api/v1/');
+
 // Requests that arrive through the public tunnel (Host = PUBLIC_BASE_URL host) may only reach /media/*
+// (and /api/v1/* when API_OVER_TUNNEL=true).
 if (env.PUBLIC_BASE_URL) {
   const publicHost = new URL(env.PUBLIC_BASE_URL).host;
   app.use((req, res, next) => {
-    if (req.headers.host === publicHost && !req.path.startsWith('/media/')) return res.status(404).end();
+    if (req.headers.host === publicHost && !req.path.startsWith('/media/') && !(env.API_OVER_TUNNEL && isApi(req.path))) return res.status(404).end();
     next();
   });
 }
+// The UI routes have no login. When HOST exposes the server to the network, only the
+// key-protected external API (/api/v1) and public media are reachable from other machines.
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+app.use((req, res, next) => {
+  if (LOOPBACK.has(req.socket.remoteAddress) || isApi(req.path) || req.path.startsWith('/media/')) return next();
+  res.status(404).end();
+});
 app.use('/media', publicRouter);
 
-app.use(cors({ origin: env.CLIENT_URL }));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
 
+// External API: any origin (auth is the per-project API key, no cookies)
+app.use('/api/v1', cors(), require('./routes/v1'));
+
+app.use(cors({ origin: env.CLIENT_URL }));
 app.use('/api/health', require('./routes/health'));
 app.use('/api/oauth', require('./routes/oauth'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/connections', require('./routes/connections').global);
 app.use('/api/media', mediaRouter);
 app.use('/api/posts', require('./routes/posts'));
-app.get('/api/config', (req, res) => res.json({ ok: true, youtubeAudited: env.YOUTUBE_AUDITED, publicUrlConfigured: !!env.PUBLIC_BASE_URL, rules: require('./platforms/rules').RULES }));
+app.get('/api/config', (req, res) => res.json({
+  ok: true, youtubeAudited: env.YOUTUBE_AUDITED, publicUrlConfigured: !!env.PUBLIC_BASE_URL, rules: require('./platforms/rules').RULES,
+  api: {
+    localBase: `${env.SERVER_URL.replace(/\/$/, '')}/api/v1`,
+    tunnelBase: env.API_OVER_TUNNEL && env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/api/v1` : null,
+    host: env.HOST,
+  },
+}));
 
 app.use(notFound);
 app.use(errorHandler);

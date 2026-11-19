@@ -10,6 +10,8 @@ const schema = z.object({
   CLIENT_URL: z.string().url().default('http://localhost:5173'),
   SERVER_URL: z.string().url().default('http://localhost:5000'),
   PUBLIC_BASE_URL: opt,
+  // "true" = the external API (/api/v1) is also reachable through the PUBLIC_BASE_URL tunnel (for cloud tools)
+  API_OVER_TUNNEL: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   TOKEN_ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'must be 32 bytes as hex (64 chars)'),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_UPLOAD_MB: z.coerce.number().default(4096),

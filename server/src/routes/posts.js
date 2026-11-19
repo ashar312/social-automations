@@ -11,12 +11,13 @@ const mediaSvc = require('../services/media');
 const adapters = require('../platforms');
 const { ensureFresh } = require('../services/tokens');
 
-scoped.post('/validate', async (req, res, next) => {
+const validate = async (req, res, next) => {
   try {
     const { results } = await check(req.body, req.project.id);
     res.json({ ok: true, results });
   } catch (e) { next(e); }
-});
+};
+scoped.post('/validate', validate);
 
 /**
  * Creates a post (+ targets) in one project from an evaluated check().
@@ -49,7 +50,7 @@ async function createPost(projectId, { body, media, results, accountIds }, copyM
   return post;
 }
 
-scoped.post('/', async (req, res, next) => {
+const create = async (req, res, next) => {
   try {
     const first = await check(req.body, req.project.id);
     const { body, results } = first;
@@ -78,9 +79,10 @@ scoped.post('/', async (req, res, next) => {
         also.push({ projectId: pid, projectName: proj.name, ok: true, id: p2.id });
       } catch (e) { also.push({ projectId: pid, projectName: proj ? proj.name : String(pid), ok: false, error: e.message }); }
     }
-    res.status(201).json({ ok: true, id: post.id, also });
+    res.status(201).json({ ok: true, id: post.id, status: post.status, also });
   } catch (e) { next(e); }
-});
+};
+scoped.post('/', create);
 
 // Lists one project's posts (scoped) or, for the global game stats, every project's (GET /api/posts).
 const list = async (req, res, next) => {
@@ -121,7 +123,7 @@ const targetView = (t) => ({
   startedAt: t.started_at, finishedAt: t.finished_at,
 });
 
-router.get('/:id', async (req, res, next) => {
+const detail = async (req, res, next) => {
   try {
     const p = await Post.findByPk(req.params.id, { include: ['targets', { model: MediaFile, as: 'media' }] });
     if (!p) return res.status(404).json({ ok: false, error: 'Not found' });
@@ -137,9 +139,10 @@ router.get('/:id', async (req, res, next) => {
       },
     });
   } catch (e) { next(e); }
-});
+};
+router.get('/:id', detail);
 
-router.post('/:id/targets/:platform/retry', async (req, res, next) => {
+const retry = async (req, res, next) => {
   try {
     const t = await PostTarget.findOne({ where: { post_id: req.params.id, platform: req.params.platform } });
     if (!t) return res.status(404).json({ ok: false, error: 'Not found' });
@@ -148,9 +151,10 @@ router.post('/:id/targets/:platform/retry', async (req, res, next) => {
     await Post.update({ status: 'publishing' }, { where: { id: req.params.id } });
     res.json({ ok: true });
   } catch (e) { next(e); }
-});
+};
+router.post('/:id/targets/:platform/retry', retry);
 
-router.delete('/:id', async (req, res, next) => {
+const remove = async (req, res, next) => {
   try {
     const p = await Post.findByPk(req.params.id, { include: ['targets', { model: MediaFile, as: 'media' }] });
     if (!p) return res.status(404).json({ ok: false, error: 'Not found' });
@@ -169,7 +173,9 @@ router.delete('/:id', async (req, res, next) => {
     await p.destroy();
     res.json({ ok: true, remote });
   } catch (e) { next(e); }
-});
+};
+router.delete('/:id', remove);
 
 module.exports = router;
 module.exports.scoped = scoped;
+module.exports.handlers = { validate, create, list, detail, retry, remove };

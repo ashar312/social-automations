@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom'
-import { FaCheck, FaChevronDown, FaClockRotateLeft, FaFolder, FaPenNib, FaPlug, FaPlus, FaTableCellsLarge } from 'react-icons/fa6'
+import { FaCheck, FaChevronDown, FaClockRotateLeft, FaCode, FaFolder, FaPenNib, FaPlug, FaPlus, FaTableCellsLarge } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
 import { useProject } from '../projects/useProject.js'
 import { Notice } from './ui.jsx'
@@ -11,6 +11,7 @@ const links = [
   ['/history', 'History', FaClockRotateLeft],
   ['/connections', 'Connections', FaPlug],
   ['/projects', 'Projects', FaFolder],
+  ['/integration', 'Integration', FaCode],
 ]
 
 // Accounts that need attention in ANY active project: expired/errored tokens, or tokens expiring within 7 days.

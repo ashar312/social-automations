@@ -5,6 +5,7 @@ const { fn, col } = require('sequelize');
 const { Project, PlatformAccount, Post } = require('../db/models');
 const loadProject = require('../middleware/loadProject');
 const { publicView } = require('../services/accounts');
+const apiKeys = require('../services/apiKeys');
 
 router.param('projectId', loadProject);
 
@@ -32,8 +33,9 @@ function view(p, accounts = [], postCount = 0) {
   const shown = accounts.map((a) => publicView(a));
   const worst = shown.reduce((w, a) => ((WORST[a.status] || 0) > (WORST[w] || 0) ? a.status : w), 'none');
   return {
-    id: p.id, name: p.name, color: p.color, icon: p.icon, description: p.description, settings: p.settings || {},
+    id: p.id, publicId: p.public_id, name: p.name, color: p.color, icon: p.icon, description: p.description, settings: p.settings || {},
     archived: !!p.archived_at, createdAt: p.created_at,
+    apiKey: p.api_key_hash ? { hint: p.api_key_hint, createdAt: p.api_key_created_at, lastUsedAt: p.api_key_last_used_at } : null,
     connected: shown.map((a) => a.platform), connectedCount: shown.length, postCount, worstStatus: worst,
   };
 }
@@ -73,6 +75,21 @@ router.delete('/:projectId', async (req, res, next) => {
     const posts = await Post.count({ where: { project_id: req.project.id } });
     if (posts) return res.status(409).json({ ok: false, error: `This project has ${posts} post(s). Archive it instead.` });
     await req.project.destroy(); // cascades its connections
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// API key for the external API (/api/v1). The plain key is returned only here, once.
+router.post('/:projectId/api-key', async (req, res, next) => {
+  try {
+    const { key, fields } = apiKeys.generate();
+    await req.project.update(fields);
+    res.status(201).json({ ok: true, key, projectId: req.project.public_id, project: view(req.project) });
+  } catch (e) { next(e); }
+});
+router.delete('/:projectId/api-key', async (req, res, next) => {
+  try {
+    await req.project.update({ api_key_hash: null, api_key_hint: null, api_key_created_at: null, api_key_last_used_at: null });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

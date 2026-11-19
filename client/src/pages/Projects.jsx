@@ -4,6 +4,7 @@ import { FaBoxArchive, FaPen, FaPlus, FaRotateLeft, FaTrash } from 'react-icons/
 import { api } from '../api.js'
 import { Notice, PageTitle, PlatformIcon } from '../components/ui.jsx'
 import { useConfirm } from '../components/useConfirm.js'
+import { ApiAccess } from '../projects/ApiAccess.jsx'
 import { ProjectForm } from '../projects/ProjectForm.jsx'
 import { useProject } from '../projects/useProject.js'
 
@@ -65,6 +66,7 @@ export default function Projects() {
                   {p.connected.length ? p.connected.map((pl) => <PlatformIcon key={pl} platform={pl} size="xs" />) : <span className="text-xs text-muted">No connections yet</span>}
                   <span className="ml-auto text-xs font-medium text-muted">{p.postCount} post{p.postCount === 1 ? '' : 's'}</span>
                 </div>
+                {!p.archived && <ApiAccess project={p} onChange={reload} />}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {!p.archived && <button onClick={() => open(p)} className="btn btn-sm">Open</button>}
                   <button onClick={() => setEditing(p)} className="btn btn-sm"><FaPen aria-hidden="true" />Edit</button>
