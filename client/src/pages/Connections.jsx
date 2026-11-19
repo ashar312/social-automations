@@ -24,6 +24,7 @@ export default function Connections() {
   const [msg, setMsg] = useState({})
   const [params, setParams] = useSearchParams()
   const [pages, setPages] = useState(null)
+  const [liAccounts, setLiAccounts] = useState(null)
   const flash = params.get('connected')
   const error = params.get('error')
   const sel = params.get('sel')
@@ -34,7 +35,14 @@ export default function Connections() {
     if (params.get('pick') === 'meta' && sel) {
       api.get(`/api/oauth/meta/pages?sel=${sel}`).then((d) => setPages(d.pages)).catch((e) => setMsg({ meta: e.message }))
     }
+    if (params.get('pick') === 'linkedin' && sel) {
+      api.get(`/api/oauth/linkedin/accounts?sel=${sel}`).then((d) => setLiAccounts(d.accounts)).catch((e) => setMsg({ meta: e.message }))
+    }
   }, [params, sel])
+  async function chooseLinkedin(id) {
+    await api.post('/api/oauth/linkedin/select', { sel, id })
+    setLiAccounts(null); setParams({ connected: 'linkedin' }); load(); refresh(); reloadProjects()
+  }
 
   async function test(p) {
     setMsg((m) => ({ ...m, [p]: 'Testing…' }))
@@ -81,6 +89,15 @@ export default function Connections() {
           <p className="panel-title mb-3">Which Facebook Page should be used?</p>
           <div className="flex flex-wrap gap-2">
             {pages.map((p) => <button key={p.id} onClick={() => choose(p.id)} className="btn btn-xp btn-sm">{p.name}{p.usedIn?.length > 0 && <span className="text-xs font-bold opacity-70"> · also in {p.usedIn.join(', ')}</span>}</button>)}
+          </div>
+        </div>
+      )}
+
+      {liAccounts && (
+        <div className="panel mb-5 p-5">
+          <p className="panel-title mb-3">Post to LinkedIn as…</p>
+          <div className="flex flex-wrap gap-2">
+            {liAccounts.map((a) => <button key={a.id} onClick={() => chooseLinkedin(a.id)} className="btn btn-xp btn-sm">{a.name}</button>)}
           </div>
         </div>
       )}

@@ -23,6 +23,8 @@ const schema = z.object({
   LINKEDIN_CLIENT_SECRET: opt,
   LINKEDIN_REDIRECT_URI: z.string().default('http://localhost:5000/api/oauth/linkedin/callback'),
   LINKEDIN_API_VERSION: z.string().default('202611'),
+  // Set to "true" once your LinkedIn app has the Community Management API product (needed to post as a Company Page)
+  LINKEDIN_ORG_POSTING: z.string().default('false'),
   GOOGLE_CLIENT_ID: opt,
   GOOGLE_CLIENT_SECRET: opt,
   GOOGLE_REDIRECT_URI: z.string().default('http://localhost:5000/api/oauth/youtube/callback'),
