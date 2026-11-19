@@ -48,6 +48,7 @@ In the newer console, this is under **Google Auth Platform** (APIs & Services â†
    ```
    http://localhost:5000/api/oauth/youtube/callback
    ```
+   With local HTTPS ([06-local-https.md](../06-local-https.md)), use `https://localhost:5000/api/oauth/youtube/callback` instead. It must match `GOOGLE_REDIRECT_URI`.
 5. **Create**. Copy the **Client ID** into `GOOGLE_CLIENT_ID` and the **Client secret** into `GOOGLE_CLIENT_SECRET`.
 
 ## Step 5: Request the API audit (do this early, uploads are private until it passes)

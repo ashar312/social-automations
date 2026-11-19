@@ -47,7 +47,7 @@ Both are self-serve and usually approved instantly or within minutes. Check the 
    ```
    http://localhost:5000/api/oauth/linkedin/callback
    ```
-   It must match `LINKEDIN_REDIRECT_URI` exactly.
+   It must match `LINKEDIN_REDIRECT_URI` exactly. With local HTTPS ([06-local-https.md](../06-local-https.md)), the preferred value is `https://localhost:5000/api/oauth/linkedin/callback`.
 
 ## Step 5: Test the OAuth flow by hand (optional, to check the setup before coding)
 

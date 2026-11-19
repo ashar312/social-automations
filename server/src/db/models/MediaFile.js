@@ -2,6 +2,7 @@
 module.exports = (s, T) => s.define('MediaFile', {
   id: { type: T.INTEGER, autoIncrement: true, primaryKey: true },
   post_id: T.INTEGER,
+  project_id: T.INTEGER,
   position: { type: T.TINYINT, allowNull: false, defaultValue: 0 },
   kind: { type: T.ENUM('image', 'video', 'thumbnail'), allowNull: false },
   original_name: { type: T.STRING(255), allowNull: false },

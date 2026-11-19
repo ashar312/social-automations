@@ -15,7 +15,7 @@ export function Copy({ text, label }) {
 }
 
 /** Project id + API key for the external API (/api/v1). See plans/guides/api.md */
-export function ApiAccess({ project, onChange }) {
+export function ApiAccess({ project, onChange, onKey }) {
   const confirm = useConfirm()
   const [key, setKey] = useState('') // plain key, shown once
   const [error, setError] = useState('')
@@ -27,13 +27,13 @@ export function ApiAccess({ project, onChange }) {
       if (!sure) return
     }
     setBusy(true); setError('')
-    try { const d = await api.post(`/api/projects/${project.id}/api-key`); setKey(d.key); await onChange() } catch (e) { setError(e.message) } finally { setBusy(false) }
+    try { const d = await api.post(`/api/projects/${project.id}/api-key`); setKey(d.key); onKey?.(d.key); await onChange() } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
   async function revoke() {
     const sure = await confirm({ title: 'Revoke the API key?', body: 'Systems using it get 401 errors from now on.', confirmLabel: 'Revoke', danger: true })
     if (!sure) return
     setBusy(true); setError('')
-    try { await api.del(`/api/projects/${project.id}/api-key`); setKey(''); await onChange() } catch (e) { setError(e.message) } finally { setBusy(false) }
+    try { await api.del(`/api/projects/${project.id}/api-key`); setKey(''); onKey?.(''); await onChange() } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
 
   return (

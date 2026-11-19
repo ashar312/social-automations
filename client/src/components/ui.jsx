@@ -73,6 +73,14 @@ export function Bar({ pct, tone = 'brand', label, size = 'md' }) {
   )
 }
 
+/** Where a post came from: posts.created_via is null (app UI), "api" or "mcp:<AI app name>". */
+export function ViaBadge({ via }) {
+  if (!via) return null
+  const mcp = via.startsWith('mcp:')
+  const label = mcp ? `via MCP · ${via.slice(4) || 'AI app'}` : `via ${via.toUpperCase()}`
+  return <span className="pill pill-info" title={mcp ? 'Created by an AI app through the MCP server' : 'Created through the external API'}>{label}</span>
+}
+
 export function Notice({ tone = 'bad', children }) {
   return (
     <div className={`notice notice-${tone}`} role={tone === 'bad' ? 'alert' : 'status'}>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { FaArrowLeft, FaArrowRotateRight, FaArrowUpRightFromSquare, FaTrash } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
-import { Bar, Notice, PlatformIcon, PostStatus, TargetStatus, postTone, PLATFORM_META } from '../components/ui.jsx'
+import { Bar, Notice, PlatformIcon, PostStatus, TargetStatus, ViaBadge, postTone, PLATFORM_META } from '../components/ui.jsx'
 import { useConfirm } from '../components/useConfirm.js'
 import { useProject } from '../projects/useProject.js'
 
@@ -79,6 +79,7 @@ export default function PostDetail() {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <PostStatus status={post.status} />
               <span className="text-sm font-medium text-body">{live}/{active} platforms live</span>
+              <ViaBadge via={post.createdVia} />
             </div>
           </div>
           <div className="flex items-center gap-4">

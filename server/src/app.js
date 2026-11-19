@@ -29,6 +29,8 @@ app.use((req, res, next) => {
 app.use('/media', publicRouter);
 
 app.use(morgan('dev'));
+// MCP server (before the global JSON parser: it has its own, larger limit for base64 uploads)
+app.use('/api/v1/mcp', cors({ exposedHeaders: ['Mcp-Session-Id', 'WWW-Authenticate'] }), require('./mcp'));
 app.use(express.json({ limit: '1mb' }));
 
 // External API: any origin (auth is the per-project API key, no cookies)
@@ -47,6 +49,12 @@ app.get('/api/config', (req, res) => res.json({
     localBase: `${env.SERVER_URL.replace(/\/$/, '')}/api/v1`,
     tunnelBase: env.API_OVER_TUNNEL && env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/api/v1` : null,
     host: env.HOST,
+    https: env.HTTPS,
+    mcpEnabled: env.MCP_ENABLED,
+    mcpLocal: `${env.SERVER_URL.replace(/\/$/, '')}/api/v1/mcp`,
+    mcpTunnel: env.API_OVER_TUNNEL && env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/api/v1/mcp` : null,
+    mcpBridge: require('path').resolve(__dirname, '../bin/mcp-stdio.js').split(require('path').sep).join('/'),
+    mcpLocalFiles: !!env.MCP_ALLOWED_DIRS.trim(),
   },
 }));
 

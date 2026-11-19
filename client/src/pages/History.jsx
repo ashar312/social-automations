@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FaArrowLeft, FaArrowRight, FaCalendarDays, FaFileLines, FaImage, FaInbox, FaVideo } from 'react-icons/fa6'
 import { api, PLATFORMS, PLATFORM_LABEL } from '../api.js'
-import { PageTitle, PlatformIcon, PostStatus, TargetChip, postTone } from '../components/ui.jsx'
+import { PageTitle, PlatformIcon, PostStatus, TargetChip, ViaBadge, postTone } from '../components/ui.jsx'
 import { useProject } from '../projects/useProject.js'
 
 const busy = (p) => ['queued', 'publishing'].includes(p.status)
@@ -84,6 +84,7 @@ export default function History() {
                   <span>#{p.id}</span>
                   <span className="capitalize">{p.contentType}</span>
                   <span>{new Date(p.createdAt).toLocaleString()}</span>
+                  <ViaBadge via={p.createdVia} />
                   {p.scheduledAt && new Date(p.scheduledAt) > new Date() && <span className="inline-flex items-center gap-1 font-medium text-brand"><FaCalendarDays aria-hidden="true" />Scheduled {new Date(p.scheduledAt).toLocaleString()}</span>}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">{p.targets.map((t) => <TargetChip key={t.id} t={t} />)}</div>

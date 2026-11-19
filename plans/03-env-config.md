@@ -10,6 +10,12 @@ HOST=127.0.0.1
 CLIENT_URL=http://localhost:5173
 SERVER_URL=http://localhost:5000
 
+# Local HTTPS with mkcert (06-local-https.md). Both empty = plain HTTP. Paths relative to server/.
+# When set, use https:// in CLIENT_URL, SERVER_URL and the three *_REDIRECT_URI values
+# (e.g. CLIENT_URL=https://localhost:5173, SERVER_URL=https://localhost:5000).
+TLS_CERT_FILE=../certs/localhost.pem
+TLS_KEY_FILE=../certs/localhost-key.pem
+
 # Public HTTPS base URL that points at this server (Cloudflare Tunnel / ngrok)
 # Used so Instagram can download media: ${PUBLIC_BASE_URL}/media/<token>/<file>
 PUBLIC_BASE_URL=https://your-tunnel.example.com

@@ -3,3 +3,5 @@ node_modules
 uploads/
 dist
 backups/
+# Local HTTPS cert + private key (mkcert, plans/06-local-https.md). Never commit.
+certs/

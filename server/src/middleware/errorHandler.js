@@ -6,6 +6,8 @@ function notFound(req, res) {
 function errorHandler(err, req, res, next) {
   const status = err.status || 500;
   if (status >= 500) console.error(err);
-  res.status(status).json({ ok: false, error: status >= 500 ? 'Internal server error' : err.message });
+  const body = { ok: false, error: status >= 500 ? 'Internal server error' : err.message };
+  if (status < 500 && err.results) body.results = err.results; // per-platform validation details
+  res.status(status).json(body);
 }
 module.exports = { notFound, errorHandler };

@@ -27,6 +27,8 @@ No logins and no multi-user support. It runs on `localhost` for your own use.
 | [02-phases.md](02-phases.md) | **The build plan.** Phases, tasks and "done when" checks |
 | [03-env-config.md](03-env-config.md) | `.env` variables and where each value comes from |
 | [04-projects.md](04-projects.md) | Projects: group connections per channel/brand, each with its own LinkedIn, YouTube, Facebook and Instagram |
+| [05-mcp-server.md](05-mcp-server.md) | MCP server: let Claude and other AI tools post, schedule and track posts in a project as tools |
+| [06-local-https.md](06-local-https.md) | Run the UI and API on `https://localhost` with a trusted mkcert certificate (needed for Meta OAuth) |
 | [guides/linkedin-setup.md](guides/linkedin-setup.md) | Step-by-step LinkedIn app, keys and OAuth setup |
 | [guides/youtube-setup.md](guides/youtube-setup.md) | Step-by-step Google Cloud / YouTube Data API setup |
 | [guides/meta-instagram-facebook-setup.md](guides/meta-instagram-facebook-setup.md) | Step-by-step Meta app, Facebook Page and Instagram setup |

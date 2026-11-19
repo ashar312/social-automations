@@ -7,4 +7,5 @@ module.exports = (s, T) => s.define('Post', {
   status: { type: T.ENUM('draft', 'queued', 'publishing', 'completed', 'partial', 'failed'), allowNull: false, defaultValue: 'draft' },
   project_id: { type: T.INTEGER, allowNull: false },
   scheduled_at: T.DATE,
+  created_via: T.STRING(64), // null = app UI, "api", "mcp:<client>"
 }, { tableName: 'posts', underscored: true });

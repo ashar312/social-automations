@@ -8,6 +8,10 @@ GET /media/<public_token>/<filename>
 ```
 Only this path is exposed. `public_token` is a random 32-character value per file, so URLs can't be guessed. **Only `/media/*` should be reachable from outside. Don't tunnel the `/api` routes publicly.** If the tunnel tool can't restrict paths, the server rejects non-`/media` requests that arrive with the tunnel's `Host` header.
 
+> **Local HTTPS on?** ([06-local-https.md](../06-local-https.md)) Point the tunnel at the HTTPS origin instead:
+> `cloudflared tunnel --url https://localhost:5000 --no-tls-verify` or `ngrok http https://localhost:5000`.
+> `--no-tls-verify` is fine because cloudflared connects over loopback. `PUBLIC_BASE_URL` doesn't change.
+
 ## Option A: Cloudflare Tunnel (recommended, free, stable URL with a domain)
 
 **Quick, no account (URL changes each time):**

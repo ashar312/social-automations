@@ -17,6 +17,8 @@ const create = z.object({
   settings: z.object({
     captionFooter: z.string().max(500).optional(),
     hashtags: z.string().max(300).optional(),
+    // false = AI clients (MCP) may only schedule posts, at least 10 minutes ahead
+    mcpPublishNow: z.boolean().optional(),
   }).nullish(),
 });
 const patch = create.partial().extend({ archived: z.boolean().optional() });
@@ -65,6 +67,8 @@ router.patch('/:projectId', async (req, res, next) => {
     const d = parse(patch, req.body);
     const { archived, ...rest } = d;
     if (archived !== undefined) rest.archived_at = archived ? new Date() : null;
+    // merge, so the project form and the MCP toggle don't wipe each other's keys
+    if (rest.settings) rest.settings = { ...(req.project.settings || {}), ...rest.settings };
     await req.project.update(rest);
     res.json({ ok: true, project: view(req.project) });
   } catch (e) { next(dupe(e)); }
@@ -91,6 +95,20 @@ router.delete('/:projectId/api-key', async (req, res, next) => {
   try {
     await req.project.update({ api_key_hash: null, api_key_hint: null, api_key_created_at: null, api_key_last_used_at: null });
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// MCP (Integration page): what the server offers this project, and a real connection test with a key
+router.get('/:projectId/mcp', async (req, res, next) => {
+  try {
+    const { describe } = require('../mcp/server');
+    res.json({ ok: true, ...(await describe({ project: req.project, client: 'app', local: true })) });
+  } catch (e) { next(e); }
+});
+router.post('/:projectId/mcp/test', async (req, res, next) => {
+  try {
+    const { selfTest } = require('../mcp/selfTest');
+    res.json({ ok: true, ...(await selfTest(req.project, req.body && req.body.key)) });
   } catch (e) { next(e); }
 });
 

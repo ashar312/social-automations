@@ -7,8 +7,9 @@
     "db:create": "sequelize db:create --charset utf8mb4 --collate utf8mb4_unicode_ci",
     "db:migrate": "sequelize db:migrate",
     "db:migrate:undo": "sequelize db:migrate:undo",
-    "start": "node src/server.js",
-    "dev": "nodemon --watch src --watch .env src/server.js",
+    "start": "node --use-system-ca src/server.js",
+    "dev": "nodemon --watch src --watch .env --exec \"node --use-system-ca\" src/server.js",
+    "mcp:stdio": "node --use-system-ca bin/mcp-stdio.js",
     "db:backup": "node -e \"require('./src/services/backup').runBackup().then(f=>console.log(f)).catch(e=>{console.error(e.message);process.exit(1)})\""
   },
   "keywords": [],
@@ -16,6 +17,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "axios": "^1.21.1",
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",

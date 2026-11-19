@@ -55,7 +55,7 @@
 ## Step 6: Configure Facebook Login
 
 1. **Facebook Login → Settings**:
-   - **Valid OAuth Redirect URIs:** add `http://localhost:5000/api/oauth/meta/callback`. In Development mode, `localhost` redirects are allowed. If Meta rejects the http URL, use your HTTPS tunnel URL (`https://<tunnel>/api/oauth/meta/callback`) instead and update `META_REDIRECT_URI`.
+   - **Valid OAuth Redirect URIs:** add `https://localhost:5000/api/oauth/meta/callback` and set `META_REDIRECT_URI` to the same. Meta enforces HTTPS on redirect URIs, so run the app with local HTTPS ([06-local-https.md](../06-local-https.md)); then turn on "Enforce HTTPS" and "Use Strict Mode".
    - Client OAuth login: **On**, Web OAuth login: **On**.
    - If you're using *Facebook Login for Business*, you may need a **Configuration** (with the permissions above, token type "User access token"). The `config_id` then replaces `scope` in the login URL.
 2. **App settings → Basic:** copy the **App ID** into `META_APP_ID` and the **App Secret** into `META_APP_SECRET`. Add an App Domain, a Privacy Policy URL (any page you own) and an icon if prompted.
