@@ -3,7 +3,8 @@ const PLATFORMS = ['linkedin', 'youtube', 'facebook', 'instagram'];
 module.exports = (s, T) => {
   const M = s.define('PlatformAccount', {
     id: { type: T.INTEGER, autoIncrement: true, primaryKey: true },
-    platform: { type: T.ENUM(...PLATFORMS), allowNull: false, unique: true },
+    platform: { type: T.ENUM(...PLATFORMS), allowNull: false },
+    project_id: { type: T.INTEGER, allowNull: false },
     external_id: { type: T.STRING(128), allowNull: false },
     display_name: { type: T.STRING(255), allowNull: false },
     avatar_url: T.STRING(1024),

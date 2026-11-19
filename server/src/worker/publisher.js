@@ -1,7 +1,8 @@
 'use strict';
 const { Op } = require('sequelize');
 const env = require('../config/env');
-const { Post, PostTarget, MediaFile, ActivityLog, PlatformAccount } = require('../db/models');
+const { Post, PostTarget, MediaFile, ActivityLog, PlatformAccount, Project } = require('../db/models');
+const { syncSiblings } = require('../services/accounts');
 const adapters = require('../platforms');
 const { ensureFresh, testAccount } = require('../services/tokens');
 const { rollup } = require('../services/posts');
@@ -69,10 +70,11 @@ async function runTarget(t) {
   try {
     await t.update({ status: 'uploading', started_at: t.started_at || new Date(), progress: 0 });
     await Post.update({ status: 'publishing' }, { where: { id: post.id } });
-    const accModel = await PlatformAccount.findOne({ where: { platform: t.platform } });
+    const accModel = (t.platform_account_id && await PlatformAccount.findByPk(t.platform_account_id))
+      || await PlatformAccount.findOne({ where: { project_id: post.project_id, platform: t.platform } });
     if (!accModel) throw new PublishError(`${t.platform} is not connected`, { reconnect: true });
     ctx.account = await ensureFresh(accModel);
-    await log(t.id, 'info', `Publishing to ${t.platform} (attempt ${t.attempts + 1})`);
+    await log(t.id, 'info', `Publishing to ${t.platform} in project "${(await Project.findByPk(post.project_id))?.name}" (attempt ${t.attempts + 1})`);
     const res = await adapters[t.platform].publish(ctx);
     await t.update({
       status: 'published', progress: 100, external_id: res.externalId, external_url: res.url,
@@ -84,7 +86,11 @@ async function runTarget(t) {
     const attempts = t.attempts + 1;
     const retry = err.retryable && attempts < MAX_ATTEMPTS;
     await log(t.id, 'error', err.message, err.raw);
-    if (err.reconnect) await PlatformAccount.update({ status: 'expired' }, { where: { platform: t.platform } });
+    if (err.reconnect) {
+      const acc = (t.platform_account_id && await PlatformAccount.findByPk(t.platform_account_id))
+        || await PlatformAccount.findOne({ where: { project_id: post.project_id, platform: t.platform } });
+      if (acc) { await acc.update({ status: 'expired' }); await syncSiblings(acc); }
+    }
     await PostTarget.update({
       status: retry ? 'pending' : 'failed', attempts, locked_at: null, progress: 0,
       next_attempt_at: retry ? new Date(Date.now() + BACKOFF_MIN[attempts - 1] * 60000) : null,
@@ -112,12 +118,13 @@ async function cleanupMedia() {
   const cutoff = new Date(Date.now() - env.MEDIA_RETENTION_DAYS * 86400000);
   const posts = await Post.findAll({ where: { status: { [Op.in]: ['completed', 'partial', 'failed'] }, updated_at: { [Op.lt]: cutoff } }, include: [{ model: MediaFile, as: 'media' }] });
   let n = 0;
-  for (const p of posts) for (const m of p.media) { await media.removeFiles(m.stored_path).catch(() => {}); n++; }
+  const ids = posts.map((p) => p.id);
+  for (const p of posts) for (const m of p.media) { await media.removeUnlessShared(m, ids).catch(() => {}); n++; }
   if (n) console.log(`Cleanup: checked ${n} media file(s) older than ${env.MEDIA_RETENTION_DAYS} days`);
 }
 
 async function tokenHealth() {
-  for (const acc of await PlatformAccount.findAll()) {
+  for (const acc of await PlatformAccount.findAll({ include: [{ model: Project, as: 'project', required: true, where: { archived_at: null } }] })) {
     if (acc.token_expires_at && new Date(acc.token_expires_at) < new Date() && acc.platform !== 'youtube') {
       await acc.update({ status: 'expired' });
       continue;

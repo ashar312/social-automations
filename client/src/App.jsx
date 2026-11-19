@@ -5,6 +5,7 @@ import History from './pages/History.jsx'
 import PostDetail from './pages/PostDetail.jsx'
 import Connections from './pages/Connections.jsx'
 import Quests from './pages/Quests.jsx'
+import Projects from './pages/Projects.jsx'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="history" element={<History />} />
         <Route path="history/:id" element={<PostDetail />} />
         <Route path="connections" element={<Connections />} />
+        <Route path="projects" element={<Projects />} />
       </Route>
     </Routes>
   )

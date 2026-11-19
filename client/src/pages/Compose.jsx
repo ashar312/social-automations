@@ -5,6 +5,7 @@ import { api, uploadMedia, PLATFORMS, PLATFORM_LABEL } from '../api.js'
 import { Bar, CountUp, Notice, PageTitle, PlatformIcon, PLATFORM_META } from '../components/ui.jsx'
 import { prefersReducedMotion } from '../game/confetti.js'
 import { previewXp } from '../game/engine.js'
+import { useProject } from '../projects/useProject.js'
 
 const LIMITS = { linkedin: 3000, instagram: 2200, youtube: 5000, facebook: null }
 const LAUNCH_MS = 950
@@ -18,6 +19,9 @@ function suggestType(media) {
 
 export default function Compose() {
   const nav = useNavigate()
+  const { active, projects, projectApi } = useProject()
+  const [also, setAlso] = useState(new Set())
+  const [crossResult, setCrossResult] = useState(null)
   const fileRef = useRef(null)
   const launchTimer = useRef(null)
   const [media, setMedia] = useState([])
@@ -41,9 +45,9 @@ export default function Compose() {
   useEffect(() => () => clearTimeout(launchTimer.current), [])
 
   useEffect(() => {
-    api.get('/api/connections').then((d) => setConns(Object.fromEntries(d.connections.map((c) => [c.platform, c])))).catch(() => {})
+    api.get(projectApi('/connections')).then((d) => setConns(Object.fromEntries(d.connections.map((c) => [c.platform, c])))).catch(() => {})
     api.get('/api/config').then(setConfig).catch(() => {})
-  }, [])
+  }, [projectApi])
 
   useEffect(() => { if (!typeTouched) setContentType(suggestType(media)) }, [media, typeTouched])
 
@@ -56,13 +60,13 @@ export default function Compose() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      api.post('/api/posts/validate', {
+      api.post(projectApi('/posts/validate'), {
         ...payloadBase,
         targets: PLATFORMS.map((p) => ({ platform: p, overrides: cleanOverrides(overrides[p]) })),
       }).then((d) => setResults(d.results)).catch((e) => setError(e.message))
     }, 350)
     return () => clearTimeout(t)
-  }, [payloadBase, overrides])
+  }, [payloadBase, overrides, projectApi])
 
   const selectable = (p) => results[p]?.supported !== false && connected(p)
   const selected = PLATFORMS.filter((p) => selectable(p) && !deselected.has(p))
@@ -98,13 +102,16 @@ export default function Compose() {
   async function publish() {
     setBusy(true); setError('')
     try {
-      const r = await api.post('/api/posts', {
+      const r = await api.post(projectApi('/posts'), {
         ...payloadBase,
         targets: PLATFORMS.filter((p) => selected.includes(p) || (results[p]?.supported === false && connected(p)))
           .map((p) => ({ platform: p, overrides: cleanOverrides(overrides[p]) })),
+        alsoProjects: [...also].filter((id) => id !== active.id),
         publishNow: !schedule,
         scheduledAt: schedule ? new Date(schedule).toISOString() : undefined,
       })
+      const failed = (r.also || []).filter((a) => !a.ok)
+      if (failed.length) { setCrossResult({ id: r.id, failed, done: r.also.filter((a) => a.ok) }); return }
       if (prefersReducedMotion()) nav(`/history/${r.id}`)
       else {
         setLaunching(true)
@@ -308,6 +315,32 @@ export default function Compose() {
             </div>
 
             {error && <Notice>{error}</Notice>}
+            {(active.settings?.captionFooter || active.settings?.hashtags) && (
+              <p className="text-xs text-ink-300">Added to every caption: {[active.settings.captionFooter, active.settings.hashtags].filter(Boolean).join(' · ')}</p>
+            )}
+            {projects.filter((p) => !p.archived && p.id !== active.id).length > 0 && (
+              <fieldset>
+                <legend className="text-sm font-extrabold">Also publish to</legend>
+                <div className="mt-1 space-y-1">
+                  {projects.filter((p) => !p.archived && p.id !== active.id).map((p) => (
+                    <label key={p.id} className="flex items-center gap-2 text-sm font-bold">
+                      <input type="checkbox" checked={also.has(p.id)} onChange={() => setAlso((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n })} />
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} aria-hidden="true" />{p.name}
+                    </label>
+                  ))}
+                </div>
+                {also.size > 0 && <p className="mt-1 text-xs text-ink-300">Creates a separate post in each project, using only the platforms connected there.</p>}
+              </fieldset>
+            )}
+            {crossResult && (
+              <Notice tone="warn">
+                <p>Posted to {active.name}{crossResult.done.length ? ` and ${crossResult.done.map((d) => d.projectName).join(', ')}` : ''}, but skipped: {crossResult.failed.map((f) => `${f.projectName} (${f.error})`).join('; ')}.</p>
+                <button onClick={() => nav(`/history/${crossResult.id}`)} className="mt-1 font-black underline">View post</button>
+              </Notice>
+            )}
+            <p className="flex items-center gap-2 text-sm font-bold text-ink-200">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: active.color }} aria-hidden="true" />Publishing to <strong>{active.name}</strong>
+            </p>
             <button
               onClick={publish}
               disabled={busy || !selected.length || blockers.length > 0 || uploading}

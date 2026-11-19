@@ -7,13 +7,28 @@
 
 ## Tables
 
-### `platform_accounts`
-One row per connected account: LinkedIn profile, YouTube channel, Facebook Page, Instagram account.
+### `projects`
+A brand/channel. Each project has its own connected accounts and posts (see `04-projects.md`).
 
 | Column | Type | Notes |
 |---|---|---|
 | id | INT PK AI | |
-| platform | ENUM('linkedin','youtube','facebook','instagram') | UNIQUE (one account per platform) |
+| name | VARCHAR(100) | UNIQUE |
+| color | VARCHAR(16) | Hex accent, default `#7c5cff` |
+| icon | VARCHAR(32) NULL | |
+| description | VARCHAR(500) NULL | |
+| settings | JSON NULL | `{ captionFooter, hashtags }`, appended to every caption in this project |
+| archived_at | DATETIME NULL | NULL = active |
+| created_at / updated_at | DATETIME | |
+
+### `platform_accounts`
+One row per connected account per project: LinkedIn profile, YouTube channel, Facebook Page, Instagram account.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | INT PK AI | |
+| project_id | INT FK → projects.id ON DELETE CASCADE | |
+| platform | ENUM('linkedin','youtube','facebook','instagram') | UNIQUE(project_id, platform): one account per platform per project |
 | external_id | VARCHAR(128) | LinkedIn person URN, YT channel ID, FB Page ID, IG user ID |
 | display_name | VARCHAR(255) | Shown on the Connections page |
 | avatar_url | VARCHAR(1024) NULL | |
@@ -26,12 +41,15 @@ One row per connected account: LinkedIn profile, YouTube channel, Facebook Page,
 | last_checked_at | DATETIME NULL | Last successful token health check |
 | created_at / updated_at | DATETIME | |
 
+Index: `(platform, external_id)` to find the same account used in several projects.
+
 ### `posts`
 One row per thing you compose.
 
 | Column | Type | Notes |
 |---|---|---|
 | id | INT PK AI | |
+| project_id | INT FK → projects.id ON DELETE RESTRICT | Index `(project_id, id)` |
 | content_type | ENUM('text','image','video','reel') | |
 | caption | TEXT | Default caption for all platforms |
 | title | VARCHAR(255) NULL | Used by YouTube |
@@ -65,6 +83,7 @@ One row per post × platform. **This table also acts as the job queue.**
 | id | INT PK AI | |
 | post_id | INT FK → posts.id ON DELETE CASCADE | |
 | platform | ENUM('linkedin','youtube','facebook','instagram') | UNIQUE(post_id, platform) |
+| platform_account_id | INT NULL FK → platform_accounts.id ON DELETE SET NULL | The account this target was queued for |
 | overrides | JSON NULL | Per-platform caption, title, privacy, tags, shareToFeed… |
 | status | ENUM('pending','uploading','processing','published','failed','skipped') | |
 | progress | TINYINT | 0 to 100, for the progress bar |
@@ -88,6 +107,7 @@ Short-lived CSRF state for OAuth redirects.
 | state | CHAR(64) PK | Random value |
 | platform | ENUM(...) | |
 | code_verifier | VARCHAR(128) NULL | PKCE (used for Google) |
+| project_id | INT NULL | Project the OAuth flow is connecting into |
 | created_at | DATETIME | The callback rejects states older than 10 minutes |
 
 ### `activity_logs` (optional but useful)
@@ -103,9 +123,10 @@ Short-lived CSRF state for OAuth redirects.
 ## Relationships
 
 ```
-posts 1───* media_files
+projects 1───* platform_accounts
+projects 1───* posts 1───* media_files
 posts 1───* post_targets 1───* activity_logs
-platform_accounts (one per platform; the worker reads it at publish time)
+post_targets *───1 platform_accounts (one per platform per project; the worker reads it at publish time)
 ```
 
 ## Status roll-up rule (`posts.status`)

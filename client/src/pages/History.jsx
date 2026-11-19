@@ -4,11 +4,14 @@ import { FaArrowLeft, FaArrowRight, FaBolt, FaCalendarDays, FaFileLines, FaImage
 import { api, PLATFORMS, PLATFORM_LABEL } from '../api.js'
 import { PageTitle, PlatformIcon, PostStatus, TargetChip, postTone } from '../components/ui.jsx'
 import { postXp } from '../game/engine.js'
+import { useProject } from '../projects/useProject.js'
 
 const busy = (p) => ['queued', 'publishing'].includes(p.status)
 const TYPE_ICON = { text: FaFileLines, image: FaImage, video: FaVideo, reel: FaVideo }
 
 export default function History() {
+  const { active, projects, projectApi } = useProject()
+  const [allProjects, setAllProjects] = useState(false)
   const [posts, setPosts] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -18,8 +21,8 @@ export default function History() {
 
   const load = useCallback(() => {
     const q = new URLSearchParams({ page, ...(status && { status }), ...(platform && { platform }) })
-    return api.get(`/api/posts?${q}`).then((d) => { setPosts(d.posts); setTotal(d.total) }).catch(() => {}).finally(() => setLoaded(true))
-  }, [page, status, platform])
+    return api.get(`${allProjects ? '/api/posts' : projectApi('/posts')}?${q}`).then((d) => { setPosts(d.posts); setTotal(d.total) }).catch(() => {}).finally(() => setLoaded(true))
+  }, [page, status, platform, projectApi, allProjects])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -32,7 +35,11 @@ export default function History() {
 
   return (
     <div>
-      <PageTitle eyebrow="Mission log" title="History" />
+      <PageTitle eyebrow={`Mission log · ${allProjects ? 'All projects' : active.name}`} title="History">
+        {projects.filter((p) => !p.archived).length > 1 && (
+          <button aria-pressed={allProjects} onClick={() => { setPage(1); setAllProjects((v) => !v) }} className="filter-pill">All projects</button>
+        )}
+      </PageTitle>
 
       <div className="mb-5 space-y-2.5">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
@@ -72,6 +79,7 @@ export default function History() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <Link to={`/history/${p.id}`} className="block min-w-0 truncate font-extrabold hover:text-xp">{p.title || p.caption || `(${p.contentType})`}</Link>
+                  {allProjects && (() => { const pr = projects.find((x) => x.id === p.projectId); return pr && <span className="mt-0.5 flex items-center gap-1.5 text-xs font-bold text-ink-300"><span className="h-2 w-2 rounded-full" style={{ background: pr.color }} aria-hidden="true" />{pr.name}</span> })()}
                   {xp > 0 && <span className="xp-tag"><FaBolt className="text-sm" aria-hidden="true" />+{xp}</span>}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-300">

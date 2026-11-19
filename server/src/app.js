@@ -24,7 +24,8 @@ app.use(express.json({ limit: '1mb' }));
 
 app.use('/api/health', require('./routes/health'));
 app.use('/api/oauth', require('./routes/oauth'));
-app.use('/api/connections', require('./routes/connections'));
+app.use('/api/projects', require('./routes/projects'));
+app.use('/api/connections', require('./routes/connections').global);
 app.use('/api/media', mediaRouter);
 app.use('/api/posts', require('./routes/posts'));
 app.get('/api/config', (req, res) => res.json({ ok: true, youtubeAudited: env.YOUTUBE_AUDITED, publicUrlConfigured: !!env.PUBLIC_BASE_URL, rules: require('./platforms/rules').RULES }));

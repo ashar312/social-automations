@@ -3,6 +3,7 @@ module.exports = (s, T) => s.define('PostTarget', {
   id: { type: T.INTEGER, autoIncrement: true, primaryKey: true },
   post_id: { type: T.INTEGER, allowNull: false },
   platform: { type: T.ENUM('linkedin', 'youtube', 'facebook', 'instagram'), allowNull: false },
+  platform_account_id: T.INTEGER,
   overrides: T.JSON,
   status: { type: T.ENUM('pending', 'uploading', 'processing', 'published', 'failed', 'skipped'), allowNull: false, defaultValue: 'pending' },
   progress: { type: T.TINYINT, allowNull: false, defaultValue: 0 },

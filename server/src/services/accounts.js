@@ -1,9 +1,11 @@
 'use strict';
-const { PlatformAccount } = require('../db/models');
+const { Op } = require('sequelize');
+const { PlatformAccount, Project } = require('../db/models');
 const { encrypt, decrypt } = require('./crypto');
 
-async function upsertAccount(platform, d) {
+async function upsertAccount(projectId, platform, d) {
   const values = {
+    project_id: projectId,
     platform,
     external_id: d.externalId,
     display_name: d.displayName,
@@ -16,13 +18,46 @@ async function upsertAccount(platform, d) {
     status: 'connected',
     last_checked_at: new Date(),
   };
-  const existing = await PlatformAccount.findOne({ where: { platform } });
+  const existing = await PlatformAccount.findOne({ where: { project_id: projectId, platform } });
+  let row;
   if (existing) {
     // keep the old refresh token if the provider didn't send a new one
     if (!values.refresh_token_enc) values.refresh_token_enc = existing.refresh_token_enc;
-    return existing.update(values);
+    row = await existing.update(values);
+  } else {
+    row = await PlatformAccount.create(values);
   }
-  return PlatformAccount.create(values);
+  await syncSiblings(row);
+  return row;
+}
+
+/**
+ * The same account (platform + external_id) can be connected in several projects, one row each.
+ * Copy token fields and status from `row` to the others, so a reconnect or refresh in one project covers all.
+ */
+async function syncSiblings(row) {
+  const [n] = await PlatformAccount.update({
+    access_token_enc: row.access_token_enc,
+    refresh_token_enc: row.refresh_token_enc,
+    token_expires_at: row.token_expires_at,
+    scopes: row.scopes,
+    status: row.status,
+    last_checked_at: row.last_checked_at,
+  }, { where: { platform: row.platform, external_id: row.external_id, id: { [Op.ne]: row.id } } });
+  return n;
+}
+
+/** Names of the other projects that use the same account, keyed by account id. */
+async function sharedWithMap(rows) {
+  const out = new Map();
+  for (const r of rows) {
+    const sibs = await PlatformAccount.findAll({
+      where: { platform: r.platform, external_id: r.external_id, id: { [Op.ne]: r.id } },
+      include: [{ model: Project, as: 'project', attributes: ['name'] }],
+    });
+    out.set(r.id, sibs.map((x) => x.project.name));
+  }
+  return out;
 }
 
 /** Decrypted view for adapters. */
@@ -40,13 +75,15 @@ function open(acc) {
   };
 }
 
-function publicView(acc) {
+function publicView(acc, sharedWith = []) {
   // YouTube's stored expiry is the 1-hour access token; the refresh token renews it on use,
   // so that expiry says nothing about whether the connection still works.
   const refreshable = acc.platform === 'youtube' && acc.refresh_token_enc;
   const exp = !refreshable && acc.token_expires_at ? new Date(acc.token_expires_at) : null;
   return {
+    projectId: acc.project_id,
     platform: acc.platform,
+    sharedWith,
     displayName: acc.display_name,
     avatarUrl: acc.avatar_url,
     externalId: acc.external_id,
@@ -57,4 +94,4 @@ function publicView(acc) {
     scopes: acc.scopes,
   };
 }
-module.exports = { upsertAccount, open, publicView };
+module.exports = { upsertAccount, syncSiblings, sharedWithMap, open, publicView };

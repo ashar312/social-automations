@@ -6,12 +6,15 @@ import '@fontsource-variable/nunito/index.css'
 import './index.css'
 import App from './App.jsx'
 import { GameProvider } from './game/GameProvider.jsx'
+import { ProjectProvider } from './projects/ProjectProvider.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <GameProvider>
-        <App />
+        <ProjectProvider>
+          <App />
+        </ProjectProvider>
       </GameProvider>
     </BrowserRouter>
   </StrictMode>,

@@ -4,6 +4,7 @@ import { FaFlask, FaLink, FaLinkSlash, FaRotate } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
 import { Bar, Notice, PageTitle, PlatformIcon, PLATFORM_META } from '../components/ui.jsx'
 import { useGame } from '../game/useGame.js'
+import { useProject } from '../projects/useProject.js'
 
 const CONNECT_VIA = { linkedin: 'linkedin', youtube: 'youtube', facebook: 'meta', instagram: 'meta' }
 const TOKEN_FULL_DAYS = 60
@@ -18,6 +19,7 @@ function Badge({ c }) {
 
 export default function Connections() {
   const { confirm, refresh } = useGame()
+  const { active, projectApi, reload: reloadProjects } = useProject()
   const [list, setList] = useState([])
   const [msg, setMsg] = useState({})
   const [params, setParams] = useSearchParams()
@@ -26,7 +28,7 @@ export default function Connections() {
   const error = params.get('error')
   const sel = params.get('sel')
 
-  const load = useCallback(() => api.get('/api/connections').then((d) => setList(d.connections)).catch(() => {}), [])
+  const load = useCallback(() => api.get(projectApi('/connections')).then((d) => setList(d.connections)).catch(() => {}), [projectApi])
   useEffect(() => { load() }, [load])
   useEffect(() => {
     if (params.get('pick') === 'meta' && sel) {
@@ -36,27 +38,28 @@ export default function Connections() {
 
   async function test(p) {
     setMsg((m) => ({ ...m, [p]: 'Testing…' }))
-    try { const r = await api.post(`/api/connections/${p}/test`); setMsg((m) => ({ ...m, [p]: r.message })) }
+    try { const r = await api.post(projectApi(`/connections/${p}/test`)); setMsg((m) => ({ ...m, [p]: r.message })) }
     catch (e) { setMsg((m) => ({ ...m, [p]: e.message })) }
     load()
   }
   async function disconnect(p) {
     const sure = await confirm({ title: `Disconnect ${PLATFORM_LABEL[p]}?`, body: 'You can reconnect it at any time.', confirmLabel: 'Disconnect', danger: true })
     if (!sure) return
-    await api.del(`/api/connections/${p}`)
+    await api.del(projectApi(`/connections/${p}`))
     load()
     refresh()
+    reloadProjects()
   }
   async function choose(pageId) {
     await api.post('/api/oauth/meta/select', { sel, pageId })
-    setPages(null); setParams({ connected: 'facebook,instagram' }); load(); refresh()
+    setPages(null); setParams({ connected: 'facebook,instagram' }); load(); refresh(); reloadProjects()
   }
 
   const linked = list.filter((c) => ['connected', 'error'].includes(c.status)).length
 
   return (
     <div>
-      <PageTitle eyebrow="Your party" title="Connections">
+      <PageTitle eyebrow={`Your party · ${active.name}`} title="Connections">
         {list.length > 0 && (
           <div className="w-full sm:w-56">
             <p className="mb-1 text-right text-sm font-extrabold tabular-nums"><span className="text-xp">{linked}</span>/{list.length} linked</p>
@@ -77,7 +80,7 @@ export default function Connections() {
         <div className="panel mb-5 p-5">
           <p className="panel-title mb-3">Which Facebook Page should be used?</p>
           <div className="flex flex-wrap gap-2">
-            {pages.map((p) => <button key={p.id} onClick={() => choose(p.id)} className="btn btn-xp btn-sm">{p.name}</button>)}
+            {pages.map((p) => <button key={p.id} onClick={() => choose(p.id)} className="btn btn-xp btn-sm">{p.name}{p.usedIn?.length > 0 && <span className="text-xs font-bold opacity-70"> · also in {p.usedIn.join(', ')}</span>}</button>)}
           </div>
         </div>
       )}
@@ -105,6 +108,7 @@ export default function Connections() {
                   <div className="min-w-0">
                     <div className="font-display text-2xl leading-tight">{PLATFORM_LABEL[c.platform]}</div>
                     <div className="truncate text-sm text-ink-300">{c.displayName || '—'}</div>
+                    {c.sharedWith?.length > 0 && <span className="pill pill-mute mt-1">Shared with: {c.sharedWith.join(', ')}</span>}
                   </div>
                 </div>
                 <Badge c={c} />
@@ -118,7 +122,7 @@ export default function Connections() {
               )}
 
               <div className="mt-5 flex flex-wrap gap-2.5">
-                <a href={`/api/oauth/${CONNECT_VIA[c.platform]}/start`} className={`btn btn-sm ${connected ? 'btn-ghost' : 'btn-xp'}`}>
+                <a href={`/api/oauth/${CONNECT_VIA[c.platform]}/start?project=${active.id}`} className={`btn btn-sm ${connected ? 'btn-ghost' : 'btn-xp'}`}>
                   {connected ? <FaRotate aria-hidden="true" /> : <FaLink aria-hidden="true" />}{connected ? 'Reconnect' : 'Connect'}
                 </a>
                 {connected && <button onClick={() => test(c.platform)} className="btn btn-ghost btn-sm"><FaFlask aria-hidden="true" />Test</button>}

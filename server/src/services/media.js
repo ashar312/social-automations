@@ -57,4 +57,15 @@ async function removeFiles(rel) {
   for (const r of [rel, thumbRel(rel)]) await fs.promises.rm(abs(r), { force: true });
 }
 
-module.exports = { abs, thumbRel, probe, makeThumbnail, convertToJpeg, classify, removeFiles };
+/** Remove a media row's files unless another media row (e.g. a cross-posted copy) still points at them. */
+async function removeUnlessShared(m, ignorePostIds = []) {
+  const { MediaFile } = require('../db/models');
+  const { Op } = require('sequelize');
+  const other = await MediaFile.count({
+    where: { stored_path: m.stored_path, id: { [Op.ne]: m.id }, [Op.or]: [{ post_id: null }, { post_id: { [Op.notIn]: ignorePostIds.length ? ignorePostIds : [0] } }] },
+  });
+  if (!other) await removeFiles(m.stored_path);
+  return !other;
+}
+
+module.exports = { removeUnlessShared, abs, thumbRel, probe, makeThumbnail, convertToJpeg, classify, removeFiles };

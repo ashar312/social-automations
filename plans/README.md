@@ -26,6 +26,7 @@ No logins and no multi-user support. It runs on `localhost` for your own use.
 | [01-database.md](01-database.md) | MySQL schema (tables, columns, statuses) |
 | [02-phases.md](02-phases.md) | **The build plan.** Phases, tasks and "done when" checks |
 | [03-env-config.md](03-env-config.md) | `.env` variables and where each value comes from |
+| [04-projects.md](04-projects.md) | Projects: group connections per channel/brand, each with its own LinkedIn, YouTube, Facebook and Instagram |
 | [guides/linkedin-setup.md](guides/linkedin-setup.md) | Step-by-step LinkedIn app, keys and OAuth setup |
 | [guides/youtube-setup.md](guides/youtube-setup.md) | Step-by-step Google Cloud / YouTube Data API setup |
 | [guides/meta-instagram-facebook-setup.md](guides/meta-instagram-facebook-setup.md) | Step-by-step Meta app, Facebook Page and Instagram setup |

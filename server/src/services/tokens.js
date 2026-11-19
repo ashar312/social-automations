@@ -2,7 +2,7 @@
 const axios = require('axios');
 const { google } = require('googleapis');
 const env = require('../config/env');
-const { open } = require('./accounts');
+const { open, syncSiblings } = require('./accounts');
 const { encrypt } = require('./crypto');
 const { PublishError, fromHttp } = require('./errors');
 
@@ -21,7 +21,10 @@ function googleClient(acc) {
     if (t.access_token) patch.access_token_enc = encrypt(t.access_token);
     if (t.refresh_token) patch.refresh_token_enc = encrypt(t.refresh_token);
     if (t.expiry_date) patch.token_expires_at = new Date(t.expiry_date);
-    if (Object.keys(patch).length) await acc.model.update({ ...patch, status: 'connected' });
+    if (Object.keys(patch).length) {
+      await acc.model.update({ ...patch, status: 'connected' });
+      await syncSiblings(acc.model);
+    }
   });
   return c;
 }
@@ -34,6 +37,7 @@ async function ensureFresh(model) {
   const acc = open(model);
   if (acc.expiresAt && new Date(acc.expiresAt) < new Date() && acc.platform !== 'youtube') {
     await model.update({ status: 'expired' });
+    await syncSiblings(model);
     throw new PublishError(`${acc.platform} token expired. Reconnect the account on the Connections page.`, { reconnect: true });
   }
   return acc;
@@ -59,11 +63,13 @@ async function testAccount(model) {
       label = data.username;
     }
     await model.update({ status: 'connected', last_checked_at: new Date() });
+    await syncSiblings(model);
     return { ok: true, message: `Token works${label ? ` (${label})` : ''}` };
   } catch (e) {
     const err = fromHttp(e);
     const invalid = err.reconnect || e.message === 'invalid_grant' || e.response?.data?.error === 'invalid_grant';
     await model.update({ status: invalid ? 'expired' : 'error' });
+    await syncSiblings(model);
     return { ok: false, error: invalid ? 'Token is invalid or revoked. Reconnect the account.' : err.message };
   }
 }

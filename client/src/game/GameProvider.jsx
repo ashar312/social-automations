@@ -66,7 +66,10 @@ export function GameProvider({ children }) {
   const refresh = useCallback(async () => {
     const id = ++requestId.current
     try {
-      const [posts, conns] = await Promise.all([fetchAllPosts(), api.get('/api/connections')])
+      const [posts, projs] = await Promise.all([fetchAllPosts(), api.get('/api/projects')])
+      // Full Party counts as done if ANY single project has every platform connected
+      const best = Math.max(0, ...projs.projects.map((p) => p.connectedCount))
+      const conns = { connections: Array.from({ length: best }, () => ({ status: 'connected' })) }
       if (id !== requestId.current) return
       const next = buildStats(posts, conns.connections)
       const unlocked = next.achievements.filter((a) => a.unlocked).map((a) => a.id)

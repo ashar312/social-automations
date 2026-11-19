@@ -17,6 +17,7 @@ async function req(method, url, body) {
 export const api = {
   get: (u) => req('GET', u),
   post: (u, b) => req('POST', u, b ?? {}),
+  patch: (u, b) => req('PATCH', u, b ?? {}),
   del: (u) => req('DELETE', u),
 }
 

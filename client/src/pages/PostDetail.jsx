@@ -5,6 +5,7 @@ import { api, PLATFORM_LABEL } from '../api.js'
 import { Bar, Notice, PlatformIcon, PostStatus, TargetStatus, postTone, PLATFORM_META } from '../components/ui.jsx'
 import { postXp } from '../game/engine.js'
 import { useGame } from '../game/useGame.js'
+import { useProject } from '../projects/useProject.js'
 
 const HEADLINE = {
   completed: 'Mission complete',
@@ -19,6 +20,7 @@ export default function PostDetail() {
   const { id } = useParams()
   const nav = useNavigate()
   const { confirm, refresh } = useGame()
+  const { projects, active: activeProject, setActive } = useProject()
   const [post, setPost] = useState(null)
   const [raw, setRaw] = useState({})
   const [error, setError] = useState('')
@@ -73,6 +75,12 @@ export default function PostDetail() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="eyebrow">Post #{post.id} · {post.contentType}</p>
+            {post.projectId !== activeProject.id && (
+              <p className="mb-1 text-xs font-bold text-ink-200">
+                In project {projects.find((p) => p.id === post.projectId)?.name || post.projectId}{' '}
+                <button onClick={() => setActive(post.projectId)} className="font-black text-aqua underline">Switch</button>
+              </p>
+            )}
             <h1 className="font-display text-4xl leading-none">{HEADLINE[post.status] || post.status}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <PostStatus status={post.status} />
