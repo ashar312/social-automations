@@ -71,20 +71,20 @@ export default function Compose() {
   async function addFiles(files) {
     setError('')
     for (const f of files) {
-      const u = { name: f.name, pct: 0 }
+      const u = { id: crypto.randomUUID(), name: f.name, pct: 0 }
       setUploads((l) => [...l, u])
       try {
-        const m = await uploadMedia(f, (pct) => setUploads((l) => l.map((x) => (x === u ? { ...x, pct } : x))))
+        const m = await uploadMedia(f, (pct) => setUploads((l) => l.map((x) => (x.id === u.id ? { ...x, pct } : x))))
         setMedia((cur) => {
           // a video replaces everything; images can be many but not mixed with a video
           if (m.kind === 'video') return [m]
           return [...cur.filter((x) => x.kind === 'image'), m]
         })
       } catch (e) {
-        setUploads((l) => l.map((x) => (x === u ? { ...x, error: e.message } : x)))
+        setUploads((l) => l.map((x) => (x.id === u.id ? { ...x, error: e.message } : x)))
         continue
       }
-      setUploads((l) => l.filter((x) => x !== u))
+      setUploads((l) => l.filter((x) => x.id !== u.id))
     }
   }
 
@@ -151,8 +151,8 @@ export default function Compose() {
 
             {uploads.length > 0 && (
               <div className="mt-3 space-y-2.5">
-                {uploads.map((u, i) => (
-                  <div key={i} className="text-sm">
+                {uploads.map((u) => (
+                  <div key={u.id} className="text-sm">
                     <div className="mb-1 flex justify-between gap-3 font-bold"><span className="truncate">{u.name}</span><span className="tabular-nums text-xp">{u.error ? '' : `${u.pct}%`}</span></div>
                     {u.error ? <Notice>{u.error}</Notice> : <Bar pct={u.pct} label={`Uploading ${u.name}`} />}
                   </div>

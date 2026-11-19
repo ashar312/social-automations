@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Link, Outlet, useLocation } from 'react-router-dom'
-import { FaClockRotateLeft, FaFire, FaPenNib, FaPlug, FaRocket, FaTrophy } from 'react-icons/fa6'
+import { FaClockRotateLeft, FaFire, FaPenNib, FaPlug, FaTrophy } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
 import { useGame } from '../game/useGame.js'
 import { Bar, CountUp, Notice } from './ui.jsx'
@@ -66,7 +66,7 @@ export default function Layout() {
       <header className="sticky top-0 z-40 border-b-2 border-ink-800 bg-ink-950/85 backdrop-blur-md">
         <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5" aria-label="Main">
           <Link to="/compose" className="flex items-center gap-2.5" aria-label="Social Automations home">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-xp text-lg text-[#17220a] shadow-[0_3px_0_var(--color-xp-deep)]"><FaRocket aria-hidden="true" /></span>
+            <img src="/logo.svg" alt="" className="h-10 w-10" />
             <span className="hidden font-display text-lg leading-none lg:block">Social<br /><span className="text-xp">Automations</span></span>
           </Link>
           <div className="hidden items-center gap-1 md:flex">

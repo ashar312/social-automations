@@ -41,7 +41,10 @@ function open(acc) {
 }
 
 function publicView(acc) {
-  const exp = acc.token_expires_at ? new Date(acc.token_expires_at) : null;
+  // YouTube's stored expiry is the 1-hour access token; the refresh token renews it on use,
+  // so that expiry says nothing about whether the connection still works.
+  const refreshable = acc.platform === 'youtube' && acc.refresh_token_enc;
+  const exp = !refreshable && acc.token_expires_at ? new Date(acc.token_expires_at) : null;
   return {
     platform: acc.platform,
     displayName: acc.display_name,

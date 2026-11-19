@@ -10,7 +10,13 @@ const thumbRel = (rel) => `${rel}.thumb.jpg`;
 function probe(file) {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(file, (err, data) => {
-      if (err) return reject(new Error(`ffprobe failed: ${err.message}`));
+      if (err) {
+        console.warn(`ffprobe failed for ${file}: ${err.message.split('\n').filter(Boolean).pop()}`);
+        const broken = /moov atom not found|Invalid data found/i.test(err.message);
+        return reject(Object.assign(new Error(broken
+          ? 'This video file is incomplete or corrupted (it cannot be read). Re-export or re-download it, check it plays in a media player, then upload again.'
+          : `Could not read this media file: ${err.message.split('\n').filter(Boolean).pop()}`), { status: broken ? 400 : 500 }));
+      }
       const v = (data.streams || []).find((s) => s.codec_type === 'video');
       let w = v && v.width;
       let h = v && v.height;
