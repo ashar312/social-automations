@@ -23,13 +23,16 @@ const targetSchema = z.object({
   overrides: z.record(z.string(), z.any()).nullish().describe(
     'Optional per-platform changes. caption (all): replaces the caption on this platform. youtube: title, privacy '
     + '("public" | "unlisted" | "private"; forced private until the YouTube API audit passes), tags (array), categoryId (default "22"). '
-    + 'instagram: shareToFeed (false = Reel only in the Reels tab).',
+    + 'instagram: shareToFeed (false = Reel only in the Reels tab). linkedin: title (carousel header for document posts).',
   ),
 });
 const bodySchema = z.object({
-  contentType: z.enum(['text', 'image', 'video', 'reel']).describe('reel = vertical short video (Instagram/Facebook Reels, YouTube Shorts)'),
+  contentType: z.enum(['text', 'image', 'video', 'reel', 'document']).describe(
+    'reel = vertical short video (Instagram/Facebook Reels, YouTube Shorts). '
+    + 'document = PDF carousel (LinkedIn only; exactly one PDF media id; needs a title)',
+  ),
   caption: z.string().default('').describe("Post text / video description. The project's caption footer and hashtags are appended automatically"),
-  title: z.string().nullish().describe('Video title. Required for YouTube'),
+  title: z.string().nullish().describe('Video title (YouTube) or carousel title (LinkedIn PDF). Required for both'),
   mediaIds: z.array(z.number().int()).default([]).describe('Ids from an upload_media_* call, in display order. Each id can be used in one post only'),
   targets: z.array(targetSchema).min(1, 'Pick at least one platform').describe('Platforms to post to'),
   alsoProjects: z.array(z.number().int()).default([]),
@@ -196,6 +199,7 @@ function listView(p) {
     id: p.id, projectId: p.project_id, contentType: p.content_type, caption: p.caption, title: p.title, status: p.status,
     scheduledAt: p.scheduled_at, createdAt: p.created_at, createdVia: p.created_via || null,
     thumbnailMediaId: media[0] ? media[0].id : null,
+    pageCount: media[0] && media[0].kind === 'document' ? media[0].page_count : null,
     targets: (p.targets || []).map(targetView),
   };
 }

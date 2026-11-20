@@ -43,6 +43,12 @@ project.post('/media', (req, res, next) => {
     .catch(next);
 }, handleUpload);
 
+// JSON { mediaIds: [2-20 image ids], size?, fit?, background?, name? } → a PDF media row (kind "document")
+project.post('/media/carousel', wrap(async (req, res) => {
+  const { buildCarousel } = require('../services/carousel');
+  res.json({ ok: true, ...(await buildCarousel(req.body, { projectId: req.project.id, api: true })) });
+}));
+
 // ---- posts ----
 project.post('/posts/validate', wrap(async (req, res) => {
   res.json({ ok: true, ...(await svc.validatePost(req.project, req.body, API)) });

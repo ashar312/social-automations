@@ -45,6 +45,7 @@ All tools act on the project the key belongs to (no project id argument needed; 
 | `upload_media_from_url` | `POST /media` (JSON) | open-world, not read-only | `{ url, name? }` → media `{ id, kind, width, height, duration, suggestedType }` |
 | `upload_media_base64` | new, uses `ingest()` | not read-only | `{ filename, data (base64), mimeType }` for small images an AI generated or the user pasted. Cap at `MCP_MAX_INLINE_MB` (default 10) |
 | `upload_media_from_path` | new, uses `ingest()` | not read-only | **Off by default.** Only when `MCP_ALLOWED_DIRS` is set and the caller is loopback. Copies a local file (e.g. a rendered video) into uploads. Path must resolve inside an allowed dir (no `..`, symlinks resolved) |
+| `build_carousel_pdf` | `POST /media/carousel`, `services/carousel.js` | not read-only | `{ mediaIds (2-20 images, slide order), size?, fit?, background?, name? }` → a PDF media row (`kind: "document"`, `pageCount`). Uses up the images. For LinkedIn PDF carousels (07-linkedin-pdf-carousel.md). The upload tools also accept PDFs |
 | `validate_post` | `POST /posts/validate` | read-only | Dry run. Same input as `create_post` |
 | `create_post` | `POST /posts` | **destructive / open-world** | Publishes publicly (or schedules). Description tells the AI to validate first and confirm with the user |
 | `list_posts` | `GET /posts` | read-only | `page`, `limit`, `status`, `platform` |
@@ -67,7 +68,7 @@ Errors are returned as tool results with `isError: true` and the API's readable 
 | `social://project` | Same as `get_project` |
 | `social://rules` | Platform rules |
 | `social://posts/{id}` | Resource template for one post |
-| `social://media/{id}/thumb` | Thumbnail image (blob) so a multimodal model can look at uploaded media |
+| `social://media/{id}/thumb` | Thumbnail image (blob) so a multimodal model can look at uploaded media. PDFs: the PDF itself (blob, under `MCP_MAX_INLINE_MB`) plus a text note with the page count |
 
 Resources are optional for clients; tools alone are enough. Build them after tools.
 
@@ -77,11 +78,12 @@ Resources are optional for clients; tools alone are enough. Build them after too
 |---|---|---|
 | `publish_everywhere` | `mediaUrl`, `topic` | get_project → upload → draft per-platform captions using project settings → validate → ask the user to confirm → create → wait → report links |
 | `weekly_schedule` | `topic`, `startDate` | Plan and schedule several posts across the week |
+| `linkedin_carousel` | `topic`, `slides?` | get_project → check LinkedIn → outline (hook, 4-8 value slides, CTA), title, caption → OK → upload → build_carousel_pdf → validate (contentType `document`) → OK → create → wait → link |
 | `fix_failed_posts` | — | list failed posts → read errors → retry the ones that can be retried, explain the rest (e.g. "reconnect LinkedIn in the app") |
 
 ### 1.4 Server `instructions`
 
-The MCP `initialize` response includes short instructions for the model: call `get_project` first; YouTube needs a title and a video; Instagram has no text posts; media ids are single-use; always `validate_post` and get user confirmation before `create_post`; times need an ISO offset.
+The MCP `initialize` response includes short instructions for the model: call `get_project` first; YouTube needs a title and a video; Instagram has no text posts; media ids are single-use; always `validate_post` and get user confirmation before `create_post`; times need an ISO offset; PDF carousels are LinkedIn-only (contentType `document`, one PDF, title required).
 
 ## 2. Server changes
 

@@ -112,6 +112,14 @@ router.post('/:projectId/mcp/test', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Build a LinkedIn PDF carousel from uploaded images (plans/07-linkedin-pdf-carousel.md)
+router.post('/:projectId/media/carousel', async (req, res, next) => {
+  try {
+    const { buildCarousel } = require('../services/carousel');
+    res.json({ ok: true, ...(await buildCarousel(req.body, { projectId: req.project.id })) });
+  } catch (e) { next(e); }
+});
+
 router.use('/:projectId/connections', require('./connections').scoped);
 router.use('/:projectId/posts', require('./posts').scoped);
 

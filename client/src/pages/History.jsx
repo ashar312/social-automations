@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FaArrowLeft, FaArrowRight, FaCalendarDays, FaFileLines, FaImage, FaInbox, FaVideo } from 'react-icons/fa6'
+import { FaArrowLeft, FaArrowRight, FaCalendarDays, FaFileLines, FaFilePdf, FaImage, FaInbox, FaVideo } from 'react-icons/fa6'
 import { api, PLATFORMS, PLATFORM_LABEL } from '../api.js'
 import { PageTitle, PlatformIcon, PostStatus, TargetChip, ViaBadge, postTone } from '../components/ui.jsx'
 import { useProject } from '../projects/useProject.js'
 
 const busy = (p) => ['queued', 'publishing'].includes(p.status)
-const TYPE_ICON = { text: FaFileLines, image: FaImage, video: FaVideo, reel: FaVideo }
+const TYPE_ICON = { text: FaFileLines, image: FaImage, video: FaVideo, reel: FaVideo, document: FaFilePdf }
+const typeLabel = (p) => (p.contentType === 'document' ? `PDF carousel${p.pageCount ? ` · ${p.pageCount} pages` : ''}` : p.contentType)
 
 export default function History() {
   const { active, projects, projectApi } = useProject()
@@ -72,7 +73,7 @@ export default function History() {
             <li key={p.id} style={{ '--i': i }} className={`card card-hover status-bar tone-${postTone(p.status)} flex gap-4 p-3 sm:p-4`}>
               <Link to={`/history/${p.id}`} className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-sunken text-xl text-muted" aria-label={`Open post ${p.id}`}>
                 <TypeIcon aria-hidden="true" />
-                {p.thumbnailMediaId && <img src={`/api/media/${p.thumbnailMediaId}/thumb`} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />}
+                {p.thumbnailMediaId && p.contentType !== 'document' && <img src={`/api/media/${p.thumbnailMediaId}/thumb`} alt="" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />}
               </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
@@ -82,7 +83,7 @@ export default function History() {
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                   <PostStatus status={p.status} />
                   <span>#{p.id}</span>
-                  <span className="capitalize">{p.contentType}</span>
+                  <span className={p.contentType === 'document' ? '' : 'capitalize'}>{typeLabel(p)}</span>
                   <span>{new Date(p.createdAt).toLocaleString()}</span>
                   <ViaBadge via={p.createdVia} />
                   {p.scheduledAt && new Date(p.scheduledAt) > new Date() && <span className="inline-flex items-center gap-1 font-medium text-brand"><FaCalendarDays aria-hidden="true" />Scheduled {new Date(p.scheduledAt).toLocaleString()}</span>}

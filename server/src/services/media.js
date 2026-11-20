@@ -8,10 +8,14 @@ const { safeGet } = require('./netGuard');
 
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
 const VIDEO_EXT = ['.mp4', '.mov'];
-const MEDIA_EXT = [...IMAGE_EXT, ...VIDEO_EXT];
-const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.mp4': 'video/mp4', '.mov': 'video/quicktime' };
-const EXT_BY_TYPE = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'video/mp4': '.mp4', 'video/quicktime': '.mov' };
-const UNSUPPORTED = 'Unsupported file type. Use jpg, png, webp, mp4 or mov.';
+const DOC_EXT = ['.pdf'];
+const MEDIA_EXT = [...IMAGE_EXT, ...VIDEO_EXT, ...DOC_EXT];
+const MIME = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.pdf': 'application/pdf' };
+const EXT_BY_TYPE = {
+  'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'video/mp4': '.mp4', 'video/quicktime': '.mov', 'application/pdf': '.pdf',
+};
+const UNSUPPORTED = 'Unsupported file type. Use jpg, png, webp, mp4, mov or pdf.';
+const kindOf = (ext) => (IMAGE_EXT.includes(ext) ? 'image' : DOC_EXT.includes(ext) ? 'document' : 'video');
 
 const abs = (rel) => path.join(env.UPLOAD_ROOT, rel);
 const thumbRel = (rel) => `${rel}.thumb.jpg`;
@@ -67,6 +71,7 @@ function convertToJpeg(srcAbs, destAbs) {
 /** Suggest a content type for a set of media rows. */
 function classify(media) {
   if (!media.length) return 'text';
+  if (media.length === 1 && media[0].kind === 'document') return 'document';
   const vid = media.find((m) => m.kind === 'video');
   if (!vid) return 'image';
   const vertical = vid.width && vid.height && vid.height / vid.width >= 1.5;
@@ -77,7 +82,32 @@ function classify(media) {
 const view = (r) => ({
   id: r.id, kind: r.kind, name: r.original_name, width: r.width, height: r.height,
   duration: r.duration_sec != null ? Number(r.duration_sec) : null, size: Number(r.size_bytes), mime: r.mime_type,
+  pageCount: r.page_count != null ? r.page_count : null,
 });
+
+/**
+ * Checks a PDF on disk: size cap (before reading it into memory), %PDF- magic bytes, then a pdf-lib parse.
+ * Returns { pageCount, width, height } (page 1 size in points). Never renders or executes anything.
+ */
+async function inspectPdf(absPath) {
+  const stat = await fs.promises.stat(absPath);
+  if (stat.size > env.DOC_MAX_MB * 1024 * 1024) throw bad(`PDF is larger than ${env.DOC_MAX_MB} MB`, 413);
+  const fh = await fs.promises.open(absPath, 'r');
+  const head = Buffer.alloc(5);
+  try { await fh.read(head, 0, 5, 0); } finally { await fh.close(); }
+  if (head.toString('latin1') !== '%PDF-') throw bad('This is not a valid PDF');
+  const { PDFDocument } = require('pdf-lib');
+  const BROKEN = 'PDF is password-protected or damaged. Export it again without a password.';
+  let doc;
+  try {
+    doc = await PDFDocument.load(await fs.promises.readFile(absPath), { updateMetadata: false });
+  } catch { throw bad(BROKEN); }
+  if (doc.isEncrypted) throw bad(BROKEN);
+  const pageCount = doc.getPageCount();
+  if (!pageCount) throw bad('This PDF has no pages');
+  const { width, height } = doc.getPage(0).getSize();
+  return { pageCount, width: Math.round(width), height: Math.round(height) };
+}
 
 /**
  * Probes a file already inside UPLOAD_ROOT (webp → jpg, thumbnail for videos) and saves the media row.
@@ -88,7 +118,17 @@ async function ingest(absPath, originalName, { projectId = null } = {}) {
   const { MediaFile } = require('../db/models');
   try {
     let ext = path.extname(absPath).toLowerCase();
-    const kind = IMAGE_EXT.includes(ext) ? 'image' : 'video';
+    const kind = kindOf(ext);
+    if (kind === 'document') { // no ffprobe, no thumbnail
+      const info = await inspectPdf(absPath);
+      const stat = await fs.promises.stat(absPath);
+      const row = await MediaFile.create({
+        project_id: projectId, kind, original_name: originalName, stored_path: path.relative(env.UPLOAD_ROOT, absPath).split(path.sep).join('/'),
+        public_token: crypto.randomBytes(16).toString('hex'), mime_type: MIME[ext], size_bytes: stat.size,
+        width: info.width, height: info.height, page_count: info.pageCount,
+      });
+      return { ...view(row), suggestedType: classify([row]) };
+    }
     if (ext === '.webp') {
       const jpg = absPath.replace(/\.webp$/, '.jpg');
       await convertToJpeg(absPath, jpg);
@@ -197,6 +237,6 @@ async function removeUnlessShared(m, ignorePostIds = []) {
 
 module.exports = {
   removeUnlessShared, abs, thumbRel, probe, makeThumbnail, convertToJpeg, classify, removeFiles,
-  view, ingest, importFromUrl, importBuffer, importLocalFile, monthDir,
-  IMAGE_EXT, VIDEO_EXT, MEDIA_EXT, MIME, UNSUPPORTED,
+  view, ingest, importFromUrl, importBuffer, importLocalFile, monthDir, newUploadPath, inspectPdf,
+  IMAGE_EXT, VIDEO_EXT, DOC_EXT, MEDIA_EXT, MIME, UNSUPPORTED,
 };

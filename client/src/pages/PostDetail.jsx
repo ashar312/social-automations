@@ -4,6 +4,7 @@ import { FaArrowLeft, FaArrowRotateRight, FaArrowUpRightFromSquare, FaTrash } fr
 import { api, PLATFORM_LABEL } from '../api.js'
 import { Bar, Notice, PlatformIcon, PostStatus, TargetStatus, ViaBadge, postTone, PLATFORM_META } from '../components/ui.jsx'
 import { useConfirm } from '../components/useConfirm.js'
+import CarouselPreview from '../components/CarouselPreview.jsx'
 import { useProject } from '../projects/useProject.js'
 
 const HEADLINE = {
@@ -68,7 +69,7 @@ export default function PostDetail() {
       <section className={`card status-bar tone-${postTone(post.status)} p-5 sm:p-6`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="eyebrow">Post #{post.id} · {post.contentType}</p>
+            <p className="eyebrow">Post #{post.id} · {post.contentType === 'document' ? 'PDF carousel' : post.contentType}</p>
             {post.projectId !== activeProject.id && (
               <p className="mb-1 text-xs font-medium text-body">
                 In project {projects.find((p) => p.id === post.projectId)?.name || post.projectId}{' '}
@@ -89,7 +90,9 @@ export default function PostDetail() {
         {post.caption && <p className="mt-4 whitespace-pre-wrap break-words rounded-2xl bg-sunken/70 p-3.5 text-sm text-ink">{post.caption}</p>}
         {post.media.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-3">
-            {post.media.map((m) => <img key={m.id} src={`/api/media/${m.id}/thumb`} alt="" className="h-28 rounded-xl border border-line" onError={(e) => { e.currentTarget.style.display = 'none' }} />)}
+            {post.media.map((m) => (m.kind === 'document'
+              ? <CarouselPreview key={m.id} src={`/api/media/${m.id}/file`} title={post.targets.find((t) => t.platform === 'linkedin')?.overrides?.title || post.title} size={m.size} />
+              : <img key={m.id} src={`/api/media/${m.id}/thumb`} alt="" className="h-28 rounded-xl border border-line" onError={(e) => { e.currentTarget.style.display = 'none' }} />))}
           </div>
         )}
       </section>

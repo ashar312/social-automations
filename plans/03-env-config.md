@@ -26,6 +26,8 @@ TOKEN_ENCRYPTION_KEY=
 
 UPLOAD_DIR=./uploads
 MAX_UPLOAD_MB=4096
+# Max PDF size for LinkedIn carousels (LinkedIn limit is 100 MB)
+DOC_MAX_MB=100
 MEDIA_RETENTION_DAYS=7
 
 # ── MySQL ─────────────────────────────────────────

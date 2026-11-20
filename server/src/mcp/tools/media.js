@@ -5,6 +5,7 @@ const { z } = require('zod');
 const env = require('../../config/env');
 const mediaSvc = require('../../services/media');
 const format = require('../format');
+const { buildCarousel, carouselShape } = require('../../services/carousel');
 
 const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false };
 const mediaOut = z.looseObject({ id: z.number(), kind: z.string(), suggestedType: z.string() });
@@ -36,8 +37,8 @@ module.exports = function register(define, ctx) {
 
   define('upload_media_from_url', {
     title: 'Upload media from URL',
-    description: 'The server downloads a public http(s) image or video (jpg, png, webp, mp4, mov) and stores it for this project. '
-      + 'Returns a media id for create_post. Best for large videos. Private/local network URLs are refused.',
+    description: 'The server downloads a public http(s) image, video or PDF (jpg, png, webp, mp4, mov, pdf) and stores it for this project. '
+      + 'Returns a media id for create_post. Best for large videos and PDFs. Private/local network URLs are refused.',
     inputSchema: {
       url: z.string().url().describe('Public http(s) URL of the file'),
       name: z.string().max(200).optional().describe('File name to store, e.g. "launch.mp4" (helps when the URL has no extension)'),
@@ -52,7 +53,7 @@ module.exports = function register(define, ctx) {
   define('upload_media_base64', {
     title: 'Upload media (base64)',
     description: `Upload a small file sent inline as base64 (max ${env.MCP_MAX_INLINE_MB} MB), e.g. an image you generated or the user pasted. `
-      + 'For videos or big files use upload_media_from_url. Returns a media id for create_post.',
+      + 'Image, video or PDF. For videos or big files use upload_media_from_url. Returns a media id for create_post.',
     inputSchema: {
       filename: z.string().min(1).max(200).describe('e.g. "cover.png"'),
       data: z.string().min(1).describe('File contents, base64 encoded (no data: prefix needed)'),
@@ -68,12 +69,25 @@ module.exports = function register(define, ctx) {
     return { text: format.media(m), data: m };
   });
 
+  define('build_carousel_pdf', {
+    title: 'Build a LinkedIn carousel PDF from images',
+    description: 'Use this when the user has slide images (e.g. ones you generated) and wants a LinkedIn carousel. '
+      + 'Upload each image first with upload_media_*, then call this, then create_post with contentType "document" and a title. '
+      + 'One image = one page. The source image ids are used up (freed) once the PDF exists.',
+    inputSchema: carouselShape,
+    annotations: { ...WRITE, openWorldHint: false },
+    outputSchema: mediaOut,
+  }, async (args) => {
+    const m = await buildCarousel(args, { projectId: ctx.project.id, api: true });
+    return { text: format.media(m), data: m };
+  });
+
   // Local files: only when folders are allowed AND the caller is on this machine (not via LAN or the tunnel).
   const dirs = allowedDirs();
   if (dirs.length && ctx.local) {
     define('upload_media_from_path', {
       title: 'Upload media from a local file',
-      description: `Copy a local image or video file on this computer into the project (e.g. a video you just rendered). Allowed folders: ${dirs.join(', ')}. Returns a media id for create_post.`,
+      description: `Copy a local image, video or PDF file on this computer into the project (e.g. a video you just rendered). Allowed folders: ${dirs.join(', ')}. Returns a media id for create_post.`,
       inputSchema: { path: z.string().min(1).describe('Absolute path of the file, inside an allowed folder') },
       annotations: { ...WRITE, openWorldHint: false },
       outputSchema: mediaOut,

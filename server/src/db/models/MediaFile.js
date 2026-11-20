@@ -4,7 +4,7 @@ module.exports = (s, T) => s.define('MediaFile', {
   post_id: T.INTEGER,
   project_id: T.INTEGER,
   position: { type: T.TINYINT, allowNull: false, defaultValue: 0 },
-  kind: { type: T.ENUM('image', 'video', 'thumbnail'), allowNull: false },
+  kind: { type: T.ENUM('image', 'video', 'thumbnail', 'document'), allowNull: false },
   original_name: { type: T.STRING(255), allowNull: false },
   stored_path: { type: T.STRING(512), allowNull: false },
   public_token: { type: T.CHAR(32), allowNull: false, unique: true },
@@ -13,4 +13,5 @@ module.exports = (s, T) => s.define('MediaFile', {
   width: T.INTEGER,
   height: T.INTEGER,
   duration_sec: T.DECIMAL(8, 2),
+  page_count: T.INTEGER, // PDFs only; width/height = page 1 size in points
 }, { tableName: 'media_files', underscored: true, updatedAt: false });

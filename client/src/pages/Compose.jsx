@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaCalendarDays, FaCheck, FaCloudArrowUp, FaPaperPlane, FaXmark } from 'react-icons/fa6'
+import { FaCalendarDays, FaCheck, FaCloudArrowUp, FaLayerGroup, FaPaperPlane, FaXmark } from 'react-icons/fa6'
 import { api, uploadMedia, PLATFORMS, PLATFORM_LABEL } from '../api.js'
 import { Bar, Notice, PageTitle, PlatformIcon, PLATFORM_META } from '../components/ui.jsx'
+import CarouselPreview from '../components/CarouselPreview.jsx'
+import CarouselBuilderDialog from '../components/CarouselBuilderDialog.jsx'
 import { useProject } from '../projects/useProject.js'
 
 const LIMITS = { linkedin: 3000, instagram: 2200, youtube: 5000, facebook: null }
 
 function suggestType(media) {
   if (!media.length) return 'text'
+  if (media.length === 1 && media[0].kind === 'document') return 'document'
   const v = media.find((m) => m.kind === 'video')
   if (!v) return 'image'
   return v.width && v.height && v.height / v.width >= 1.5 && v.duration <= 180 ? 'reel' : 'video'
@@ -36,6 +39,7 @@ export default function Compose() {
   const [error, setError] = useState('')
   const [drag, setDrag] = useState(false)
   const [schedule, setSchedule] = useState('')
+  const [builder, setBuilder] = useState(false)
 
   useEffect(() => {
     api.get(projectApi('/connections')).then((d) => setConns(Object.fromEntries(d.connections.map((c) => [c.platform, c])))).catch(() => {})
@@ -73,10 +77,11 @@ export default function Compose() {
       try {
         const m = await uploadMedia(f, (pct) => setUploads((l) => l.map((x) => (x.id === u.id ? { ...x, pct } : x))))
         setMedia((cur) => {
-          // a video replaces everything; images can be many but not mixed with a video
-          if (m.kind === 'video') return [m]
+          // a video or a PDF replaces everything; images can be many but not mixed with a video or PDF
+          if (m.kind === 'video' || m.kind === 'document') return [m]
           return [...cur.filter((x) => x.kind === 'image'), m]
         })
+        if (m.kind === 'document') setTitle((t) => t || m.name.replace(/\.pdf$/i, ''))
       } catch (e) {
         setUploads((l) => l.map((x) => (x.id === u.id ? { ...x, error: e.message } : x)))
         continue
@@ -113,6 +118,14 @@ export default function Compose() {
   }
 
   const primary = media[0]
+  const images = media.filter((m) => m.kind === 'image')
+  const isDoc = contentType === 'document'
+  function carouselDone(pdf) {
+    setBuilder(false)
+    setMedia([pdf])
+    setTypeTouched(false) // suggestType() picks 'document' for a single PDF
+    setContentType('document')
+  }
   const capFor = (p) => (overrides[p]?.caption ?? caption)
   const uploading = uploads.some((u) => !u.error)
   const checks = [
@@ -139,10 +152,10 @@ export default function Compose() {
               className={`dropzone ${drag ? 'dropzone-on' : ''}`}
             >
               <span className="dropzone-icon"><FaCloudArrowUp aria-hidden="true" /></span>
-              <span className="mt-2 block font-semibold">Drop an image or video here, or click to choose</span>
+              <span className="mt-2 block font-semibold">Drop an image, video or PDF here, or click to choose</span>
               <span className="block text-xs text-muted">Leave empty for a text-only post</span>
             </button>
-            <input ref={fileRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.mov" hidden onChange={(e) => { addFiles([...e.target.files]); e.target.value = '' }} />
+            <input ref={fileRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.pdf" hidden onChange={(e) => { addFiles([...e.target.files]); e.target.value = '' }} />
 
             {uploads.length > 0 && (
               <div className="mt-3 space-y-2.5">
@@ -159,7 +172,9 @@ export default function Compose() {
               <div className="stagger mt-4 flex flex-wrap gap-3">
                 {media.map((m) => (
                   <div key={m.id} className="relative">
-                    {m.kind === 'video' && media.length === 1
+                    {m.kind === 'document'
+                      ? <CarouselPreview src={`/api/media/${m.id}/file`} title={overrides.linkedin.title || title || m.name.replace(/\.pdf$/i, '')} size={m.size} warnings={results.linkedin?.warnings || []} className="w-[min(100%,28rem)]" />
+                      : m.kind === 'video' && media.length === 1
                       ? <video src={`/api/media/${m.id}/file`} controls className="max-h-72 rounded-xl border border-line" />
                       : <img src={`/api/media/${m.id}/thumb`} alt={m.name} className="h-32 rounded-xl border border-line object-cover" />}
                     <button onClick={() => setMedia((c) => c.filter((x) => x.id !== m.id))} aria-label={`Remove ${m.name || 'media'}`} className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-line-strong bg-surface text-[0.65rem] text-body shadow-card transition-colors hover:bg-bad hover:text-white"><FaXmark aria-hidden="true" /></button>
@@ -167,7 +182,15 @@ export default function Compose() {
                 ))}
               </div>
             )}
-            {primary && (
+            {images.length >= 2 && connected('linkedin') && (
+              <button type="button" onClick={() => setBuilder(true)} className="btn btn-sm mt-3">
+                <FaLayerGroup aria-hidden="true" />Make a carousel from these images
+              </button>
+            )}
+            {builder && (
+              <CarouselBuilderDialog images={images} base={projectApi()} defaultName={title || 'carousel'} onClose={() => setBuilder(false)} onDone={carouselDone} />
+            )}
+            {primary && primary.kind !== 'document' && (
               <p className="mt-2 text-xs text-muted">
                 {primary.kind} · {primary.width}×{primary.height}{primary.duration != null ? ` · ${primary.duration.toFixed(1)}s` : ''} · {(primary.size / 1048576).toFixed(1)} MB
               </p>
@@ -176,7 +199,7 @@ export default function Compose() {
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
               <label htmlFor="content-type" className="font-semibold text-body">Content type</label>
               <select id="content-type" value={contentType} onChange={(e) => { setContentType(e.target.value); setTypeTouched(true) }} className="field !w-auto !py-1.5">
-                <option value="text">Text</option><option value="image">Image(s)</option><option value="video">Video</option><option value="reel">Reel / Short</option>
+                <option value="text">Text</option><option value="image">Image(s)</option><option value="video">Video</option><option value="reel">Reel / Short</option><option value="document">PDF carousel (LinkedIn)</option>
               </select>
               {!typeTouched && media.length > 0 && <span className="pill pill-live">Auto-detected</span>}
             </div>
@@ -213,8 +236,10 @@ export default function Compose() {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="title" className="label">Title (YouTube, max 100)</label>
-                  <input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="field" />
+                  <label htmlFor="title" className="label">
+                    {isDoc ? <>Carousel title (shown above the slides on LinkedIn) <span className="text-bad">*</span></> : 'Title (YouTube, max 100)'}
+                  </label>
+                  <input id="title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={isDoc ? 400 : undefined} required={isDoc} className="field" />
                 </div>
               </div>
             ) : (
@@ -235,6 +260,12 @@ export default function Compose() {
                     </div>
                     <input aria-label="Tags" placeholder="Tags (comma separated)" value={overrides.youtube.tags || ''} onChange={(e) => setOv('youtube', 'tags', e.target.value)} className="field" />
                   </>
+                )}
+                {tab === 'linkedin' && isDoc && (
+                  <div>
+                    <label htmlFor="li-title" className="label">Carousel title override (empty = use the default title)</label>
+                    <input id="li-title" value={overrides.linkedin.title || ''} onChange={(e) => setOv('linkedin', 'title', e.target.value)} maxLength={400} className="field" />
+                  </div>
                 )}
                 {tab === 'instagram' && (
                   <label className="flex items-center gap-2 text-sm font-medium">

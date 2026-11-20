@@ -10,6 +10,20 @@ const certError = (e) => {
   return false;
 };
 
+/**
+ * Runs the platform rules on an in-memory 3-page PDF (nothing is stored): linkedin should be OK, the others skipped.
+ * Returns { ok, results } so the Integration page can show it.
+ */
+async function carouselCheck() {
+  const { evaluate } = require('../platforms/rules');
+  const fixture = { kind: 'document', page_count: 3, width: 1080, height: 1350, size_bytes: 50000, original_name: 'selftest.pdf', mime_type: 'application/pdf' };
+  const post = { contentType: 'document', caption: 'Self-test', title: 'Self-test carousel', overrides: {} };
+  const results = {};
+  for (const p of ['linkedin', 'youtube', 'facebook', 'instagram']) results[p] = evaluate(p, post, [fixture], { publicBaseUrl: env.PUBLIC_BASE_URL });
+  const ok = results.linkedin.supported && !results.linkedin.errors.length && ['youtube', 'facebook', 'instagram'].every((p) => !results[p].supported);
+  return { ok, results };
+}
+
 async function selfTest(project, key) {
   if (typeof key !== 'string' || !key.trim()) throw bad('Paste the project API key to test with.');
   if (!project.api_key_hash) throw bad('This project has no API key yet. Generate one first.');
@@ -31,6 +45,8 @@ async function selfTest(project, key) {
       server: client.getServerVersion(),
       protocolVersion: client.transport && client.transport.protocolVersion,
       toolCount: tools.length,
+      carouselTool: tools.some((t) => t.name === 'build_carousel_pdf'),
+      carouselValidation: await carouselCheck(),
       project: res.isError ? null : res.structuredContent,
     };
   } catch (e) {

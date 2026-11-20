@@ -102,7 +102,7 @@ export function PageTitle({ eyebrow, title, children }) {
   )
 }
 
-export function Modal({ label, onClose, children }) {
+export function Modal({ label, onClose, wide = false, children }) {
   const ref = useRef(null)
   useEffect(() => {
     const el = ref.current
@@ -113,7 +113,7 @@ export function Modal({ label, onClose, children }) {
     <dialog
       ref={ref}
       aria-label={label}
-      className="modal"
+      className={wide ? 'modal modal-wide' : 'modal'}
       onCancel={(e) => { e.preventDefault(); onClose() }}
       onClick={(e) => { if (e.target === ref.current) onClose() }}
     >

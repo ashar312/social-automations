@@ -16,6 +16,7 @@ function textOf(ctx) {
 
 const videoOf = (ctx) => ctx.media.find((x) => x.kind === 'video');
 const imagesOf = (ctx) => ctx.media.filter((x) => x.kind === 'image');
+const documentOf = (ctx) => ctx.media.find((x) => x.kind === 'document');
 const absPath = (mf) => m.abs(mf.stored_path);
 
 function publicUrl(mf) {
@@ -36,4 +37,4 @@ async function readRange(file, start, endExclusive) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-module.exports = { textOf, videoOf, imagesOf, absPath, publicUrl, readRange, sleep };
+module.exports = { textOf, videoOf, imagesOf, documentOf, absPath, publicUrl, readRange, sleep };

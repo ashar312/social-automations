@@ -39,6 +39,25 @@ Steps:
 4. For each approved post: upload media if any, validate_post, then create_post with publishNow: false and scheduledAt.
 5. Summarize what is scheduled (post ids and times). I can cancel any of them in History.`));
 
+  server.registerPrompt('linkedin_carousel', {
+    title: 'LinkedIn carousel',
+    description: 'Plan and post a swipeable LinkedIn PDF carousel from slide images or a finished PDF',
+    argsSchema: {
+      topic: z.string().describe('What the carousel is about'),
+      slides: z.string().optional().describe('Slide image URLs/paths (in order) or one PDF; leave empty to get an outline first'),
+    },
+  }, ({ topic, slides }) => user(`Make a LinkedIn PDF carousel about "${topic}".
+Slides: ${slides && slides.trim() ? slides : '(none yet: propose an outline first)'}
+
+Steps:
+1. get_project and check that LinkedIn is connected. If it isn't, stop and tell me to connect it in the app.
+2. Propose a slide outline (a hook slide, 4 to 8 value slides, a call-to-action slide), a carousel title (shown above the slides) and the post caption. Wait for my OK.
+3. Upload the media: each slide image with upload_media_* (in order), or the PDF if I gave one.
+4. For images: build_carousel_pdf with the image ids in slide order (size 1080x1350 unless I asked otherwise). For a PDF, use its id directly.
+5. validate_post with contentType "document", that one PDF media id, the title, and target linkedin. Fix any errors.
+6. Show me the title, caption, page count and timing, and wait for my OK.
+7. create_post, then wait_for_post and give me the live link (or the error).`));
+
   server.registerPrompt('fix_failed_posts', {
     title: 'Fix failed posts',
     description: 'Find failed or partial posts, explain the errors and retry what can be retried',

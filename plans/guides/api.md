@@ -126,9 +126,19 @@ Response:
   "duration": 31.5, "size": 8123456, "mime": "video/mp4", "suggestedType": "reel" }
 ```
 
-- Types: jpg, png, webp (converted to jpg), mp4, mov. Max size = `MAX_UPLOAD_MB`.
+- Types: jpg, png, webp (converted to jpg), mp4, mov, pdf. Max size = `MAX_UPLOAD_MB` (PDFs: `DOC_MAX_MB`, default 100). A PDF comes back as `kind: "document"` with `pageCount` and `suggestedType: "document"`. Password-protected PDFs are rejected.
 - `suggestedType` is a hint for `contentType` below.
 - A media id can be used in **one** post. Upload again for another post.
+
+**c) Build a LinkedIn PDF carousel from images**: `POST /projects/{pid}/media/carousel`. Upload 2 to 20 images first, then:
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/v1/projects/$PID/media/carousel \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"mediaIds": [42, 43, 44], "size": "1080x1350", "fit": "contain", "background": "#ffffff", "name": "launch.pdf"}'
+```
+
+One image = one page. `size`: `1080x1350` (4:5, default), `1080x1080` or `1920x1080`. `fit`: `contain` (letterbox onto `background`) or `cover` (crop from the center). Returns the new PDF media (same shape as above). The image ids are used up.
 
 ### 5.3 Create a post: `POST /projects/{pid}/posts`
 
@@ -150,9 +160,9 @@ Response:
 
 | Field | Type | Notes |
 |---|---|---|
-| `contentType` | `text` \| `image` \| `video` \| `reel` | Required. `reel` = vertical short video (Reels / Shorts) |
+| `contentType` | `text` \| `image` \| `video` \| `reel` \| `document` | Required. `reel` = vertical short video (Reels / Shorts). `document` = PDF carousel: LinkedIn only, exactly one PDF media id, needs a `title` |
 | `caption` | string | Post text / video description. The project's caption footer and hashtags (Projects → Edit) are added automatically |
-| `title` | string | Needed for YouTube |
+| `title` | string | Needed for YouTube, and for LinkedIn PDF carousels (shown above the slides, max 400) |
 | `mediaIds` | number[] | From the upload step, in display order. Images: several for a carousel where supported |
 | `targets` | array, min 1 | Platforms to post to, each `{ platform, overrides? }` |
 | `publishNow` | boolean | Default `true` |

@@ -8,6 +8,7 @@ const INSTRUCTIONS = `This server posts to the social accounts (LinkedIn, YouTub
 - Call get_project first: only target platforms that are connected. The project's caption footer and hashtags are appended to every caption automatically, so don't repeat them.
 - Upload media first (upload_media_from_url for videos / large files, upload_media_base64 for small images) and pass the returned ids as mediaIds. A media id can be used in one post only.
 - YouTube needs a video and a title. Instagram has no text-only posts. contentType "reel" = vertical short video.
+- PDF carousels are LinkedIn-only: contentType "document", exactly one PDF media id, title required. Turn slide images into one with build_carousel_pdf.
 - Scheduled times need an ISO 8601 UTC offset, e.g. 2026-11-25T09:00:00+05:00.
 - create_post publishes PUBLICLY. Always run validate_post first, show the user the final text, platforms and time, and get explicit confirmation before calling create_post. Same for delete_post.
 - create_post returns at once; use wait_for_post to report the live URLs or errors.`;

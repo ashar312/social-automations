@@ -90,6 +90,7 @@ All four adapters have the same shape, so the worker doesn't need platform-speci
 | **Image** (1 to many) | ✅ image / multi-image post | ❌ skipped | ✅ photo post | ✅ image or carousel |
 | **Video, landscape** | ✅ video post | ✅ normal video | ✅ Page video | ✅ published as a **Reel** (every IG video is a Reel now) |
 | **Reel / vertical ≤ 3 min** | ✅ video post | ✅ **Short** (vertical, ≤ 3 min) | ✅ Page **Reel** | ✅ **Reel** |
+| **PDF carousel** (one PDF, or built from 2-20 images) | ✅ **document post** (swipeable, needs a title) | ❌ skipped | ❌ skipped | ❌ skipped |
 
 In the Composer, any platform that can't take the selected content type is greyed out and shows the reason.
 

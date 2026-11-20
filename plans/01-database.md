@@ -50,9 +50,9 @@ One row per thing you compose.
 |---|---|---|
 | id | INT PK AI | |
 | project_id | INT FK → projects.id ON DELETE RESTRICT | Index `(project_id, id)` |
-| content_type | ENUM('text','image','video','reel') | |
+| content_type | ENUM('text','image','video','reel','document') | `document` = LinkedIn PDF carousel (07-linkedin-pdf-carousel.md) |
 | caption | TEXT | Default caption for all platforms |
-| title | VARCHAR(255) NULL | Used by YouTube |
+| title | VARCHAR(400) NULL | YouTube video title, or the LinkedIn PDF carousel title (max 400) |
 | status | ENUM('draft','queued','publishing','completed','partial','failed') | Rolled up from the targets |
 | scheduled_at | DATETIME NULL | NULL = publish now (scheduling comes in Phase 6) |
 | created_at / updated_at | DATETIME | |
@@ -65,14 +65,15 @@ Files attached to a post. More than one row is possible for image carousels.
 | id | INT PK AI | |
 | post_id | INT FK → posts.id ON DELETE CASCADE | |
 | position | TINYINT | Order inside a carousel |
-| kind | ENUM('image','video','thumbnail') | |
+| kind | ENUM('image','video','thumbnail','document') | `document` = PDF |
 | original_name | VARCHAR(255) | |
 | stored_path | VARCHAR(512) | Relative to `server/uploads/` |
 | public_token | CHAR(32) | Random token in the public URL (`/media/<token>/<file>`) so URLs can't be guessed |
 | mime_type | VARCHAR(100) | |
 | size_bytes | BIGINT | |
-| width / height | INT NULL | |
+| width / height | INT NULL | PDFs: page 1 size in points |
 | duration_sec | DECIMAL(8,2) NULL | |
+| page_count | INT NULL | PDFs only |
 | created_at | DATETIME | |
 
 ### `post_targets`

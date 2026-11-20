@@ -32,6 +32,11 @@ const handleUpload = [upload.single('file'), async (req, res, next) => {
 }];
 router.post('/', handleUpload);
 
+/** PDFs are served inline so the browser preview (pdf.js) can read them. */
+const fileHeaders = (r) => (r.kind === 'document'
+  ? { 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline', 'X-Content-Type-Options': 'nosniff' }
+  : { 'Content-Type': r.mime_type });
+
 async function find(req, res) {
   const r = await MediaFile.findByPk(req.params.id);
   if (!r) res.status(404).json({ ok: false, error: 'Not found' });
@@ -41,7 +46,7 @@ async function find(req, res) {
 router.get('/:id/file', async (req, res, next) => {
   try {
     const r = await find(req, res);
-    if (r) res.sendFile(m.abs(r.stored_path), { headers: { 'Content-Type': r.mime_type } });
+    if (r) res.sendFile(m.abs(r.stored_path), { headers: fileHeaders(r) });
   } catch (e) { next(e); }
 });
 router.get('/:id/thumb', async (req, res, next) => {
@@ -59,7 +64,7 @@ publicRouter.get('/:token/:filename', async (req, res, next) => {
   try {
     const r = await MediaFile.findOne({ where: { public_token: req.params.token } });
     if (!r) return res.status(404).end();
-    res.sendFile(m.abs(r.stored_path), { headers: { 'Content-Type': r.mime_type } });
+    res.sendFile(m.abs(r.stored_path), { headers: fileHeaders(r) });
   } catch (e) { next(e); }
 });
 

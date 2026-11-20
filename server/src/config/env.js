@@ -15,6 +15,7 @@ const schema = z.object({
   TOKEN_ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'must be 32 bytes as hex (64 chars)'),
   UPLOAD_DIR: z.string().default('./uploads'),
   MAX_UPLOAD_MB: z.coerce.number().default(4096),
+  DOC_MAX_MB: z.coerce.number().positive().default(100), // PDF carousels (LinkedIn limit is 100 MB)
   MEDIA_RETENTION_DAYS: z.coerce.number().default(7),
   DB_HOST: z.string().default('127.0.0.1'),
   DB_PORT: z.coerce.number().int().default(3306),

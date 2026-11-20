@@ -59,7 +59,7 @@ function McpGuide() {
       <Section title="How it works">
         <p>
           The MCP server lets AI apps (Claude Code, Claude Desktop, Cursor, VS Code and others) use this project&apos;s connected accounts as <b>tools</b>:
-          upload media, write and check captions, publish or schedule, and report the live links. For example: <i>&quot;Post this clip as a Reel to Instagram and YouTube tomorrow at 9am.&quot;</i>
+          upload media, write and check captions, publish or schedule, and report the live links. For example: <i>&quot;Post this clip as a Reel to Instagram and YouTube tomorrow at 9am.&quot;</i> or <i>&quot;Turn these 6 slides into a LinkedIn carousel titled 5 lessons from our launch.&quot;</i>
         </p>
         <p className="text-muted">
           The AI never sees your platform tokens. It uses the same per-project API key as the API tab, so one key can only post to <b>{active.name}</b>.
@@ -201,6 +201,7 @@ function McpTest({ project, initialKey }) {
         <Notice tone="good">
           Connected in {result.ms} ms to {result.server?.title || result.server?.name} {result.server?.version} · {result.toolCount} tools
           {result.protocolVersion && <> · MCP {result.protocolVersion}</>}
+          {result.carouselValidation && <> · PDF carousel check {result.carouselTool && result.carouselValidation.ok ? 'OK' : 'FAILED'}</>}
           {result.project && (
             <span className="mt-2 flex flex-wrap gap-1.5">
               {result.project.connections.map((c) => (
@@ -368,10 +369,19 @@ function ApiGuide() {
         <Code label="import from URL">{'curl -X POST "$SA_BASE/projects/$SA_PROJECT_ID/media" \\\n  -H "Authorization: Bearer $SA_API_KEY" -H "Content-Type: application/json" \\\n  -d \'{"url": "https://example.com/files/clip.mp4"}\''}</Code>
         <Code label="response">{'{ "ok": true, "id": 42, "kind": "video", "width": 1080, "height": 1920,\n  "duration": 31.5, "mime": "video/mp4", "suggestedType": "reel" }'}</Code>
         <ul className="list-disc space-y-1 pl-5 text-muted">
-          <li>jpg, png, webp (converted to jpg), mp4, mov.</li>
+          <li>jpg, png, webp (converted to jpg), mp4, mov, pdf (LinkedIn carousels, max 100 MB, no password).</li>
           <li><C>suggestedType</C> is a hint for <C>contentType</C> in the next step.</li>
           <li>A media id can be used in one post. Upload again for another post.</li>
         </ul>
+        <h3 className="pt-2 font-semibold text-ink">LinkedIn PDF carousel</h3>
+        <p>Upload a finished PDF the same way (it comes back as <C>kind: &quot;document&quot;</C> with a <C>pageCount</C>), or upload 2 to 20 images and turn them into one PDF:</p>
+        <Code label="build carousel">{`curl -X POST "$SA_BASE/projects/$SA_PROJECT_ID/media/carousel" \\
+  -H "Authorization: Bearer $SA_API_KEY" -H "Content-Type: application/json" \\
+  -d '{ "mediaIds": [42, 43, 44, 45], "size": "1080x1350", "fit": "contain", "background": "#ffffff", "name": "launch.pdf" }'`}</Code>
+        <p className="text-muted">
+          Sizes: <C>1080x1350</C> (4:5, default), <C>1080x1080</C>, <C>1920x1080</C>. <C>fit</C>: <C>contain</C> letterboxes onto <C>background</C>, <C>cover</C> crops from the center.
+          The image ids are used up; the response is the new PDF media.
+        </p>
       </Section>
 
       <Section n="5" title="Create the post">
@@ -392,12 +402,19 @@ function ApiGuide() {
   }'`}</Code>
         <p>Returns <C>201 {'{ "ok": true, "id": 123, "status": "queued" }'}</C>. The worker picks it up within seconds.</p>
         <p>Want to check first without creating anything? Send the same body to <C>/posts/validate</C>.</p>
+        <Code label="PDF carousel post">{`{
+  "contentType": "document",
+  "title": "5 lessons from our launch",
+  "caption": "Swipe through what we learned.",
+  "mediaIds": [46],
+  "targets": [{ "platform": "linkedin" }]
+}`}</Code>
 
         <h3 className="pt-2 font-semibold text-ink">Body fields</h3>
         <Table head={['Field', 'Type', 'Notes']} rows={[
-          [<C>contentType</C>, 'text | image | video | reel', 'Required. reel = vertical short video (Reels / Shorts).'],
+          [<C>contentType</C>, 'text | image | video | reel | document', 'Required. reel = vertical short video (Reels / Shorts). document = PDF carousel (LinkedIn only, one PDF, needs a title).'],
           [<C>caption</C>, 'string', "Post text or video description. The project's caption footer and hashtags are added automatically."],
-          [<C>title</C>, 'string', 'Needed for YouTube.'],
+          [<C>title</C>, 'string', 'Needed for YouTube, and for LinkedIn PDF carousels (shown above the slides, max 400).'],
           [<C>mediaIds</C>, 'number[]', 'From step 4, in display order. Several images make a carousel where supported.'],
           [<C>targets</C>, 'array (min 1)', <>Each <C>{'{ platform, overrides? }'}</C>.</>],
           [<C>publishNow</C>, 'boolean', 'Default true.'],
@@ -407,7 +424,7 @@ function ApiGuide() {
         <h3 className="pt-2 font-semibold text-ink">Per-platform overrides (optional)</h3>
         <Table head={['Key', 'Platforms', 'Meaning']} rows={[
           [<C>caption</C>, 'all', 'Replaces the main caption on this platform.'],
-          [<C>title</C>, 'YouTube', 'Replaces the main title.'],
+          [<C>title</C>, 'YouTube, LinkedIn', 'Replaces the main title (LinkedIn: the carousel header of document posts).'],
           [<C>privacy</C>, 'YouTube', 'public, unlisted or private. Forced to private until the YouTube API audit passes.'],
           [<C>tags</C>, 'YouTube', 'Array or comma-separated string.'],
           [<C>categoryId</C>, 'YouTube', 'YouTube category id (default 22).'],
@@ -441,6 +458,7 @@ function ApiGuide() {
           ['GET', <C>/rules</C>, 'Platform limits (caption length, durations). No key needed.'],
           ['GET', <C>/projects/{'{pid}'}</C>, 'Project info and connection status per platform.'],
           ['POST', <C>/projects/{'{pid}'}/media</C>, 'Upload a file (multipart "file") or import { url }.'],
+          ['POST', <C>/projects/{'{pid}'}/media/carousel</C>, 'Build a LinkedIn PDF carousel from 2 to 20 uploaded images.'],
           ['POST', <C>/projects/{'{pid}'}/posts/validate</C>, 'Dry run. Creates nothing.'],
           ['POST', <C>/projects/{'{pid}'}/posts</C>, 'Create a post (now or scheduled).'],
           ['GET', <C>/projects/{'{pid}'}/posts</C>, 'List posts. ?page, ?limit, ?status, ?platform'],
@@ -484,13 +502,13 @@ function ApiGuide() {
 }
 
 const SUPPORT = {
-  linkedin: ['text', 'image', 'video', 'reel'],
+  linkedin: ['text', 'image', 'video', 'reel', 'document'],
   youtube: ['video', 'reel'],
   facebook: ['text', 'image', 'video', 'reel'],
   instagram: ['image', 'video', 'reel'],
 }
 function SupportMatrix() {
-  const types = ['text', 'image', 'video', 'reel']
+  const types = ['text', 'image', 'video', 'reel', 'document']
   return (
     <Table head={['', ...types]} rows={PLATFORMS.map((p) => [
       <span className="flex items-center gap-2"><PlatformIcon platform={p} size="xs" />{PLATFORM_LABEL[p]}</span>,

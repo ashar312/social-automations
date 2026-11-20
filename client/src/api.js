@@ -42,3 +42,7 @@ export function uploadMedia(file, onProgress) {
 
 export const PLATFORM_LABEL = { linkedin: 'LinkedIn', youtube: 'YouTube', facebook: 'Facebook', instagram: 'Instagram' }
 export const PLATFORMS = Object.keys(PLATFORM_LABEL)
+
+// Build a LinkedIn PDF carousel from uploaded images. `base` = projectApi() of the active project.
+export const buildCarousel = (base, { mediaIds, size, fit, background, name }) =>
+  api.post(`${base}/media/carousel`, { mediaIds, size, fit, background, name })

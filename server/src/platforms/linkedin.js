@@ -3,7 +3,7 @@ const axios = require('axios');
 const fs = require('fs');
 const env = require('../config/env');
 const { fromHttp, PublishError } = require('../services/errors');
-const { textOf, videoOf, imagesOf, absPath, readRange, sleep } = require('./base');
+const { textOf, videoOf, imagesOf, documentOf, absPath, readRange, sleep } = require('./base');
 
 const API = 'https://api.linkedin.com/rest';
 const CHUNK = 4 * 1024 * 1024;
@@ -60,6 +60,31 @@ async function uploadVideo(ctx, acc, mf) {
   throw new PublishError('Timed out waiting for LinkedIn to process the video', { retryable: true });
 }
 
+/**
+ * Documents API (PDF carousel): initializeUpload → one PUT of the raw bytes → poll until AVAILABLE.
+ * Returns the urn:li:document:… to use as content.media.id.
+ */
+async function uploadDocument(ctx, acc, mf) {
+  const { data } = await axios.post(`${API}/documents?action=initializeUpload`,
+    { initializeUploadRequest: { owner: acc.externalId } }, { headers: headers(acc) });
+  const { uploadUrl, document } = data.value;
+  ctx.setProgress(10);
+  await axios.put(uploadUrl, fs.createReadStream(absPath(mf)), {
+    headers: { Authorization: `Bearer ${acc.accessToken}`, 'Content-Type': 'application/octet-stream', 'Content-Length': mf.size_bytes },
+    maxBodyLength: Infinity, maxContentLength: Infinity,
+  });
+  ctx.setProgress(60);
+  await ctx.setStatus('processing');
+  for (let i = 0; i < 60; i++) { // every 3 s for up to 3 min
+    const { data: d } = await axios.get(`${API}/documents/${encodeURIComponent(document)}`, { headers: headers(acc) });
+    ctx.log('info', `LinkedIn document status: ${d.status}`);
+    if (d.status === 'AVAILABLE') { ctx.setProgress(80); return document; }
+    if (d.status === 'PROCESSING_FAILED') throw new PublishError('LinkedIn failed to process the PDF', { raw: d });
+    await sleep(3000);
+  }
+  throw new PublishError('Timed out waiting for LinkedIn to process the PDF', { retryable: true });
+}
+
 async function publish(ctx) {
   const acc = ctx.account;
   const { caption, title } = textOf(ctx);
@@ -72,9 +97,15 @@ async function publish(ctx) {
     isReshareDisabledByAuthor: false,
   };
   try {
+    const doc = documentOf(ctx);
     const video = videoOf(ctx);
     const images = imagesOf(ctx);
-    if (video) {
+    if (doc) {
+      ctx.log('info', `Uploading PDF carousel to LinkedIn (${doc.page_count || '?'} pages)`);
+      const urn = await uploadDocument(ctx, acc, doc);
+      // title is required for documents; it is the header shown above the slides
+      body.content = { media: { id: urn, title: title || doc.original_name.replace(/\.pdf$/i, '') } };
+    } else if (video) {
       ctx.log('info', 'Uploading video to LinkedIn');
       const urn = await uploadVideo(ctx, acc, video);
       body.content = { media: { id: urn, title: title || video.original_name } };
@@ -96,4 +127,4 @@ async function remove({ target, account }) {
   await axios.delete(`${API}/posts/${encodeURIComponent(target.external_id)}`, { headers: headers(account) });
 }
 
-module.exports = { name: 'linkedin', publish, remove, escapeCommentary };
+module.exports = { name: 'linkedin', publish, remove, escapeCommentary, uploadDocument, headers, API };

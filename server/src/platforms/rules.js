@@ -5,6 +5,8 @@ const RULES = {
     maxText: 3000,
     video: { minSec: 3, maxSec: 1800, maxBytes: 500 * 1024 * 1024 },
     maxImages: 20,
+    // PDF carousel ("document post"): LinkedIn renders the pages as swipeable slides
+    document: { maxBytes: 100 * 1024 * 1024, maxPages: 300, maxTitle: 400, recommendedPages: [5, 20] },
   },
   youtube: {
     maxTitle: 100,
@@ -27,7 +29,7 @@ const hashtags = (s) => (String(s || '').match(/(^|\s)#[\p{L}\p{N}_]+/gu) || [])
 
 /** Which content types each platform can take. */
 const SUPPORTED = {
-  linkedin: ['text', 'image', 'video', 'reel'],
+  linkedin: ['text', 'image', 'video', 'reel', 'document'],
   youtube: ['video', 'reel'],
   facebook: ['text', 'image', 'video', 'reel'],
   instagram: ['image', 'video', 'reel'],
@@ -36,6 +38,11 @@ const UNSUPPORTED_REASON = {
   youtube: 'YouTube needs a video (no text or image posts through the API)',
   instagram: 'Instagram needs an image or video (text-only posts are not supported)',
 };
+const PLATFORM_NAME = { youtube: 'YouTube', facebook: 'Facebook', instagram: 'Instagram', linkedin: 'LinkedIn' };
+const DOC_RATIOS = [1, 4 / 5, 16 / 9]; // width / height of carousel pages that display well
+const reasonFor = (platform, ct) => (ct === 'document'
+  ? `${PLATFORM_NAME[platform]} can't post PDF carousels (LinkedIn only)`
+  : UNSUPPORTED_REASON[platform] || `${platform} does not support ${ct} posts`);
 
 /**
  * Evaluate one platform.
@@ -46,7 +53,7 @@ function evaluate(platform, post, media, env = {}) {
   const out = { supported: true, reason: null, errors: [], warnings: [] };
   const ct = post.contentType;
   if (!SUPPORTED[platform].includes(ct)) {
-    return { supported: false, reason: UNSUPPORTED_REASON[platform] || `${platform} does not support ${ct} posts`, errors: [], warnings: [] };
+    return { supported: false, reason: reasonFor(platform, ct), errors: [], warnings: [] };
   }
   const o = post.overrides || {};
   const caption = o.caption != null ? o.caption : post.caption || '';
@@ -60,6 +67,28 @@ function evaluate(platform, post, media, env = {}) {
   if (ct === 'text' && !caption.trim()) err('Text is empty');
   if ((ct === 'image') && !images.length) err('No image attached');
   if ((ct === 'video' || ct === 'reel') && !video) err('No video attached');
+  const docs = media.filter((m) => m.kind === 'document');
+  if (ct !== 'document' && docs.length) err('A PDF can only be posted as a PDF carousel (contentType "document")');
+
+  if (ct === 'document' && platform === 'linkedin') {
+    const r = RULES.linkedin.document;
+    const doc = docs[0];
+    if (docs.length !== 1 || media.length !== 1) {
+      err(docs.length && media.length > docs.length ? 'Remove the images/videos: a PDF carousel is one PDF only' : 'Attach one PDF');
+    }
+    const title = String((o.title != null ? o.title : post.title) || '');
+    if (!title.trim()) err('LinkedIn needs a title for PDF carousels');
+    if (title.length > r.maxTitle) err(`Title is ${title.length} characters (max ${r.maxTitle})`);
+    if (doc) {
+      const pages = Number(doc.page_count) || 0;
+      if (Number(doc.size_bytes) > r.maxBytes) err('PDF is over 100 MB (LinkedIn limit)');
+      if (pages > r.maxPages) err(`PDF has ${pages} pages (max ${r.maxPages})`);
+      if (pages && pages < 2) warn("A one-page document doesn't swipe");
+      if (pages > r.recommendedPages[1]) warn(`Carousels over ${r.recommendedPages[1]} pages get fewer completions`);
+      const rt = ratio(doc);
+      if (rt && !DOC_RATIOS.some((x) => Math.abs(rt / x - 1) <= 0.03)) warn('Pages look best at 1:1, 4:5 or 16:9');
+    }
+  }
 
   if (platform === 'linkedin') {
     const r = RULES.linkedin;

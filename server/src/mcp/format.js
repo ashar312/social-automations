@@ -17,6 +17,11 @@ function project(p) {
 
 function media(m) {
   const dims = m.width && m.height ? ` ${m.width}x${m.height}` : '';
+  if (m.kind === 'document') {
+    return `Uploaded media id ${m.id}: document, ${m.pageCount} page${m.pageCount === 1 ? '' : 's'},${dims}, "${m.name}". `
+      + `Suggested contentType: ${m.suggestedType} (LinkedIn PDF carousel). Use mediaIds: [${m.id}] in validate_post / create_post. `
+      + 'Needs a title in create_post (shown above the slides).';
+  }
   const dur = m.duration != null ? `, ${m.duration}s` : '';
   return `Uploaded media id ${m.id}: ${m.kind}${dims}${dur}, "${m.name}". Suggested contentType: ${m.suggestedType}. Use mediaIds: [${m.id}] in validate_post / create_post.`;
 }
@@ -43,14 +48,14 @@ function target(t) {
 }
 
 function post(p) {
-  const head = `Post #${p.id} (${p.contentType}): ${p.status}${p.scheduledAt ? `, scheduled for ${when(p.scheduledAt)}` : ''}`;
+  const head = `Post #${p.id} (${p.contentType}${p.pageCount ? `, ${p.pageCount} pages` : ''}): ${p.status}${p.scheduledAt ? `, scheduled for ${when(p.scheduledAt)}` : ''}`;
   const cap = p.caption ? `\nCaption: ${p.caption.length > 140 ? `${p.caption.slice(0, 140)}…` : p.caption}` : '';
   return `${head}${cap}\n${(p.targets || []).map(target).join('\n')}`;
 }
 
 function postList(r) {
   if (!r.posts.length) return `No posts (page ${r.page}, ${r.total} total).`;
-  return `${r.total} post(s), page ${r.page}:\n${r.posts.map((p) => `#${p.id} ${p.contentType} ${p.status}${p.scheduledAt ? ` scheduled ${when(p.scheduledAt)}` : ''} [${p.targets.map((t) => `${t.platform}:${t.status}`).join(', ')}]${p.caption ? ` "${p.caption.slice(0, 60).replace(/\s+/g, ' ')}${p.caption.length > 60 ? '…' : ''}"` : ''}`).join('\n')}`;
+  return `${r.total} post(s), page ${r.page}:\n${r.posts.map((p) => `#${p.id} ${p.contentType}${p.pageCount ? ` (${p.pageCount}p)` : ''} ${p.status}${p.scheduledAt ? ` scheduled ${when(p.scheduledAt)}` : ''} [${p.targets.map((t) => `${t.platform}:${t.status}`).join(', ')}]${p.caption ? ` "${p.caption.slice(0, 60).replace(/\s+/g, ' ')}${p.caption.length > 60 ? '…' : ''}"` : ''}`).join('\n')}`;
 }
 
 module.exports = { project, media, validation, post, postList };
