@@ -26,20 +26,34 @@ async function publish(ctx) {
   const privacy = env.YOUTUBE_AUDITED ? wanted : 'private';
   if (privacy !== wanted) ctx.log('warn', `YouTube audit not passed: uploading as private instead of ${wanted}`);
 
-  const yt = google.youtube({ version: 'v3', auth: googleClient(acc) });
+  const auth = googleClient(acc);
+  const yt = google.youtube({ version: 'v3', auth });
   const size = Number(video.size_bytes);
+  const upload = () => yt.videos.insert({
+    part: ['snippet', 'status'],
+    requestBody: {
+      snippet: { title, description, tags: tagsOf(overrides.tags), categoryId: String(overrides.categoryId || '22') },
+      status: { privacyStatus: privacy, selfDeclaredMadeForKids: false },
+    },
+    media: { body: fs.createReadStream(absPath(video)) },
+  }, {
+    onUploadProgress: (evt) => ctx.setProgress(Math.min(98, Math.round((evt.bytesRead / size) * 98))),
+    maxBodyLength: Infinity,
+  });
   try {
-    const { data } = await yt.videos.insert({
-      part: ['snippet', 'status'],
-      requestBody: {
-        snippet: { title, description, tags: tagsOf(overrides.tags), categoryId: String(overrides.categoryId || '22') },
-        status: { privacyStatus: privacy, selfDeclaredMadeForKids: false },
-      },
-      media: { body: fs.createReadStream(absPath(video)) },
-    }, {
-      onUploadProgress: (evt) => ctx.setProgress(Math.min(98, Math.round((evt.bytesRead / size) * 98))),
-      maxBodyLength: Infinity,
-    });
+    // Refresh an expired access token up front rather than mid-upload (a stale token made
+    // Google answer "Could not determine client ID from request").
+    await auth.getAccessToken();
+    let data;
+    try {
+      ({ data } = await upload());
+    } catch (e) {
+      if (!/could not determine client id/i.test(e.message || '')) throw e;
+      ctx.log('warn', 'YouTube rejected the upload credentials; refreshing the token and retrying once');
+      auth.credentials.expiry_date = 1; // force a refresh
+      await auth.getAccessToken();
+      ({ data } = await upload());
+    }
     const url = ctx.post.content_type === 'reel' ? `https://www.youtube.com/shorts/${data.id}` : `https://www.youtube.com/watch?v=${data.id}`;
     return { externalId: data.id, url };
   } catch (e) {
