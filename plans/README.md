@@ -30,6 +30,8 @@ No logins and no multi-user support. It runs on `localhost` for your own use.
 | [05-mcp-server.md](05-mcp-server.md) | MCP server: let Claude and other AI tools post, schedule and track posts in a project as tools |
 | [06-local-https.md](06-local-https.md) | Run the UI and API on `https://localhost` with a trusted mkcert certificate (needed for Meta OAuth) |
 | [07-linkedin-pdf-carousel.md](07-linkedin-pdf-carousel.md) | LinkedIn PDF carousels (document posts): upload or build from images, swipeable preview in Compose, and MCP support |
+| [08-user-accounts-auth.md](08-user-accounts-auth.md) | Multi-user: sign up / sign in (email + password, LinkedIn; Facebook and Instagram flagged off), per-user data, Settings, forgot password over SMTP, moving existing data to the owner account |
+| [09-email-engine.md](09-email-engine.md) | Email engine: outbox + SMTP sender + cron jobs for welcome, connected, password, reset, daily summary, first-post nudge, feedback and inactive emails |
 | [guides/linkedin-setup.md](guides/linkedin-setup.md) | Step-by-step LinkedIn app, keys and OAuth setup |
 | [guides/youtube-setup.md](guides/youtube-setup.md) | Step-by-step Google Cloud / YouTube Data API setup |
 | [guides/meta-instagram-facebook-setup.md](guides/meta-instagram-facebook-setup.md) | Step-by-step Meta app, Facebook Page and Instagram setup |
