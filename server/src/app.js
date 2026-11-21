@@ -43,6 +43,9 @@ app.use(cookieParser());
 app.use('/api', loadUser, checkOrigin);
 app.use('/api/health', require('./routes/health'));
 app.use('/api/auth', require('./routes/auth'));
+// Signed links from emails (unsubscribe, feedback): the token is the credential
+app.use('/api/email', require('./routes/email'));
+if (env.NODE_ENV !== 'production') app.use('/api/dev/emails', requireUser, require('./routes/devEmails'));
 // OAuth callbacks are browser redirects from the provider; routes/oauth.js applies requireUser itself on start/picker endpoints.
 app.use('/api/oauth', require('./routes/oauth'));
 app.use('/api/account', requireUser, require('./routes/account'));

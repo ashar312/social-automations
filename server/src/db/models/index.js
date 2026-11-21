@@ -5,7 +5,7 @@ const config = require('../../config/database')[process.env.NODE_ENV || 'develop
 const sequelize = new Sequelize(config.database, config.username, config.password, config);
 
 const db = { sequelize, Sequelize };
-for (const name of ['User', 'UserIdentity', 'UserSession', 'AuthToken', 'AuthOAuthState', 'Project', 'PlatformAccount', 'Post', 'MediaFile', 'PostTarget', 'OAuthState', 'ActivityLog']) {
+for (const name of ['User', 'UserIdentity', 'UserSession', 'AuthToken', 'AuthOAuthState', 'Project', 'PlatformAccount', 'Post', 'MediaFile', 'PostTarget', 'OAuthState', 'ActivityLog', 'EmailOutbox', 'EmailFeedback']) {
   db[name] = require(`./${name}`)(sequelize, DataTypes);
 }
 

@@ -9,6 +9,7 @@
     "db:migrate:undo": "sequelize db:migrate:undo",
     "start": "node --use-system-ca src/server.js",
     "dev": "nodemon --watch src --watch .env --exec \"node --use-system-ca\" src/server.js",
+    "email:test": "node --use-system-ca bin/email-test.js",
     "mcp:stdio": "node --use-system-ca bin/mcp-stdio.js",
     "db:backup": "node -e \"require('./src/services/backup').runBackup().then(f=>console.log(f)).catch(e=>{console.error(e.message);process.exit(1)})\""
   },
@@ -30,6 +31,7 @@
     "morgan": "^1.12.1",
     "multer": "^2.5.0",
     "mysql2": "^3.24.6",
+    "node-cron": "^4.6.0",
     "nodemailer": "^10.6.1",
     "pdf-lib": "^1.17.1",
     "sequelize": "^6.37.8",

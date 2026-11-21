@@ -72,3 +72,5 @@ Access tokens are **not** stored in `.env`. The app gets them through the OAuth 
 ## Auth and email (plan 08)
 
 `SESSION_DAYS`, `OWNER_PASSWORD` (migration only, then delete), `AUTH_LINKEDIN_ENABLED` / `AUTH_LINKEDIN_REDIRECT_URI`, `AUTH_FACEBOOK_*`, `AUTH_INSTAGRAM_*` (off), `UI_REMOTE_ACCESS` (true lifts the loopback-only rule for UI routes), `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` / `SMTP_FROM_NAME`. Placeholders are in `server/.env.example`. Secrets go only in `server/.env`.
+
+**Email engine (plan 09):** `EMAIL_ENGINE_ENABLED`, `EMAIL_LINK_SECRET` (signs unsubscribe/feedback links; derived from `TOKEN_ENCRYPTION_KEY` when empty), `EMAIL_BATCH`, `EMAIL_MAX_PER_MINUTE`, `EMAIL_MAX_PER_DAY`, `EMAIL_DIGEST_HOUR`, `EMAIL_INACTIVE_DAYS`, `EMAIL_DRY_RUN`. Placeholders are in `server/.env.example`.

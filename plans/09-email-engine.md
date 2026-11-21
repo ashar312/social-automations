@@ -212,36 +212,36 @@ New dependency: `node-cron`. (`nodemailer` comes from plan 08.)
 ## 8. Build phases
 
 ### Phase E1: Outbox + sender
-- [ ] Migration (`email_outbox`, `email_feedback`, user columns), models
-- [ ] `outbox.enqueue/kick`, `sender.js` with locking, retries, rate limits, dry-run
-- [ ] `engine.js` started from `server.js`; `EMAIL_ENGINE_ENABLED`
+- [x] Migration (`email_outbox`, `email_feedback`, user columns), models
+- [x] `outbox.enqueue/kick`, `sender.js` with locking, retries, rate limits, dry-run
+- [x] `engine.js` started from `server.js`; `EMAIL_ENGINE_ENABLED`
 
 **Done when:** enqueueing the same `(user, type, key)` twice leaves one row; with `EMAIL_DRY_RUN=true` the email is printed; with SMTP on, it arrives in Gmail; killing the server mid-send and restarting sends it once (stale lock recovered).
 
 ### Phase E2: Templates + preview
-- [ ] `layout.js` and the 8 templates (HTML + text)
-- [ ] Dev preview and send-to-myself routes, `email:test` script
+- [x] `layout.js` and the 8 templates (HTML + text)
+- [x] Dev preview and send-to-myself routes, `email:test` script
 
 **Done when:** every template previews in the browser with sample data, looks right in Gmail on desktop and on a phone, and the text version reads fine.
 
 ### Phase E3: Transactional emails (1–4)
-- [ ] Welcome (with verify button) on email and LinkedIn sign-up
-- [ ] Social connected from the OAuth callbacks and pickers (one email for Facebook + Instagram)
-- [ ] Password changed and Forgot password through the outbox with `kick()`; reset token encrypted in `payload_secret`, wiped after send
+- [x] Welcome (with verify button) on email and LinkedIn sign-up
+- [x] Social connected from the OAuth callbacks and pickers (one email for Facebook + Instagram)
+- [x] Password changed and Forgot password through the outbox with `kick()`; reset token encrypted in `payload_secret`, wiped after send
 
 **Done when:** each action sends its email within a few seconds; a token refresh does **not** send "connected"; the reset email works once and `payload_secret` is NULL afterwards.
 
 ### Phase E4: Daily summary (5)
-- [ ] `users.timezone` (signup + Settings), `jobs/dailySummary.js` hourly with catch-up until 12:00 local
-- [ ] `first_post_published_at` set by the worker
+- [x] `users.timezone` (signup + Settings), `jobs/dailySummary.js` hourly with catch-up until 12:00 local
+- [x] `first_post_published_at` set by the worker
 
 **Done when:** with test posts scheduled yesterday (one published, one failed), the 09:00 run sends one summary with both and a Retry link; a user with nothing yesterday gets nothing; running the job twice sends once.
 
 ### Phase E5: Lifecycle (6, 7, 8) + preferences
-- [ ] `last_active_at` tracking in `loadUser`
-- [ ] `jobs/lifecycle.js` every 15 min with all guard rails
-- [ ] Notifications section in Settings, unsubscribe endpoint + page + `List-Unsubscribe` headers
-- [ ] Feedback page + `email_feedback`
+- [x] `last_active_at` tracking in `loadUser`
+- [x] `jobs/lifecycle.js` every 15 min with all guard rails
+- [x] Notifications section in Settings, unsubscribe endpoint + page + `List-Unsubscribe` headers
+- [x] Feedback page + `email_feedback`
 
 **Done when:** (set the clock forward in a test DB) a user with no post gets the nudge after 24 h exactly once; a user with a published post gets the feedback email after 3 days; a user idle 4 days gets "we miss you" once, and again only after coming back and going idle again; turning a toggle off stops that email even if it's already queued.
 

@@ -7,6 +7,8 @@ import ForgotPassword from './pages/auth/ForgotPassword.jsx'
 import ResetPassword from './pages/auth/ResetPassword.jsx'
 import FinishSignup from './pages/auth/FinishSignup.jsx'
 import VerifyEmail from './pages/auth/VerifyEmail.jsx'
+import Feedback from './pages/auth/Feedback.jsx'
+import Unsubscribed from './pages/auth/Unsubscribed.jsx'
 import Settings from './pages/Settings.jsx'
 import Layout from './components/Layout.jsx'
 import Compose from './pages/Compose.jsx'
@@ -28,6 +30,8 @@ export default function App() {
       <Route path="reset-password" element={<ResetPassword />} />
       <Route path="auth/finish" element={<FinishSignup />} />
       <Route path="verify-email" element={<VerifyEmail />} />
+      <Route path="feedback" element={<Feedback />} />
+      <Route path="unsubscribed" element={<Unsubscribed />} />
       <Route element={<RequireAuth><ProjectProvider><Layout /></ProjectProvider></RequireAuth>}>
         <Route index element={<Navigate to="/compose" replace />} />
         <Route path="overview" element={<Overview />} />

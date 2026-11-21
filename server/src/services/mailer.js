@@ -9,25 +9,30 @@ function getTransport() {
   if (!transport) {
     transport = nodemailer.createTransport({
       host: env.SMTP_HOST, port: env.SMTP_PORT, secure: env.SMTP_PORT === 465, auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+      pool: true, maxConnections: 2,
     });
   }
   return transport;
 }
 
-/** Sends an email. Without SMTP config in development the message (with its links) is logged instead. Never throws. */
-async function sendMail({ to, subject, html, text }) {
-  if (!configured()) {
-    if (env.NODE_ENV === 'production') { console.error('[mail] SMTP not configured; email to %s not sent', to); return false; }
-    console.log(`[mail:dev] to=${to} subject="${subject}"\n${text}`);
-    return true;
+/**
+ * Sends one email and THROWS on failure (the email engine decides about retries).
+ * Without SMTP config in development, or with EMAIL_DRY_RUN=true, the message is logged instead.
+ * Returns { messageId }.
+ */
+async function deliver({ to, subject, html, text, headers }) {
+  if (env.EMAIL_DRY_RUN || (!configured() && env.NODE_ENV !== 'production')) {
+    console.log(`[mail:${env.EMAIL_DRY_RUN ? 'dry-run' : 'dev'}] to=${to} subject="${subject}"\n${text}`);
+    return { messageId: `dry-run-${Date.now()}` };
   }
-  try {
-    const from = env.SMTP_FROM || env.SMTP_USER;
-    await getTransport().sendMail({ from: `"${env.SMTP_FROM_NAME}" <${from}>`, to, subject, html, text });
-    return true;
-  } catch (e) {
-    console.error('[mail] send failed:', e.message);
-    return false;
-  }
+  if (!configured()) throw Object.assign(new Error('SMTP is not configured'), { code: 'ENOSMTP' });
+  const from = env.SMTP_FROM || env.SMTP_USER;
+  const info = await getTransport().sendMail({ from: `"${env.SMTP_FROM_NAME}" <${from}>`, to, subject, html, text, headers });
+  return { messageId: info.messageId };
 }
-module.exports = { sendMail, configured };
+
+/** Fire-and-forget style send for direct mail (e.g. "resend verification"). Never throws. */
+async function sendMail(msg) {
+  try { await deliver(msg); return true; } catch (e) { console.error('[mail] send failed:', e.message); return false; }
+}
+module.exports = { sendMail, deliver, configured };

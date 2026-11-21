@@ -64,6 +64,15 @@ const schema = z.object({
   SMTP_PASS: opt,
   SMTP_FROM: opt,
   SMTP_FROM_NAME: z.string().default('Social Automations'),
+  // Email engine (plans/09-email-engine.md)
+  EMAIL_ENGINE_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+  EMAIL_LINK_SECRET: opt, // signs unsubscribe/feedback links; derived from TOKEN_ENCRYPTION_KEY when empty
+  EMAIL_BATCH: z.coerce.number().int().positive().default(10),
+  EMAIL_MAX_PER_MINUTE: z.coerce.number().int().positive().default(20),
+  EMAIL_MAX_PER_DAY: z.coerce.number().int().positive().default(450),
+  EMAIL_DIGEST_HOUR: z.coerce.number().int().min(0).max(23).default(9),
+  EMAIL_INACTIVE_DAYS: z.coerce.number().positive().default(4),
+  EMAIL_DRY_RUN: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   TLS_CERT_FILE: opt,
   TLS_KEY_FILE: opt,
 });

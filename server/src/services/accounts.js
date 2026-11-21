@@ -28,6 +28,8 @@ async function upsertAccount(projectId, platform, d) {
     row = await PlatformAccount.create(values);
   }
   await syncSiblings(row);
+  // email 2: only a new connection or a reconnect of an expired/broken one counts, not a silent token refresh
+  require('../email/events').socialConnected(row, !existing || existing.status !== 'connected');
   return row;
 }
 

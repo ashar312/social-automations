@@ -44,7 +44,7 @@ async function createSession(user, req, res) {
     user_agent: (req.headers['user-agent'] || '').slice(0, 255) || null, ip: (req.ip || '').slice(0, 64) || null,
   });
   res.cookie(COOKIE, token, cookieOptions(env.SESSION_DAYS * DAY));
-  await user.update({ last_login_at: now });
+  await user.update({ last_login_at: now, last_active_at: now });
 }
 function clearCookie(res) { res.clearCookie(COOKIE, cookieOptions()); }
 
@@ -91,7 +91,7 @@ async function publicUser(u) {
   const ids = await UserIdentity.findAll({ where: { user_id: u.id } });
   return {
     id: u.id, email: u.email, emailVerified: !!u.email_verified_at, name: u.name, phone: u.phone, avatarUrl: u.avatar_url,
-    hasPassword: !!u.password_hash, identities: ids.map((i) => i.provider), createdAt: u.created_at,
+    hasPassword: !!u.password_hash, identities: ids.map((i) => i.provider), createdAt: u.createdAt,
   };
 }
 

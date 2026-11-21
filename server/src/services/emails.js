@@ -5,6 +5,7 @@ const { sendMail } = require('./mailer');
 const base = () => env.CLIENT_URL.replace(/\/$/, '');
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// Only the "resend verification" button still sends directly; all other mail goes through the outbox (src/email).
 function layout(title, intro, button, link, outro) {
   const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#222">
 <h2>${esc(title)}</h2><p>${esc(intro)}</p>
@@ -19,11 +20,4 @@ const verifyEmail = (user, token) => {
   const link = `${base()}/verify-email?token=${token}`;
   return sendMail({ to: user.email, subject: 'Verify your email', ...layout('Verify your email', `Hi ${user.name}, confirm this is your email address.`, 'Verify email', link, 'This link works for 48 hours. If you did not sign up, ignore this email.') });
 };
-const resetPassword = (user, token) => {
-  const link = `${base()}/reset-password?token=${token}`;
-  return sendMail({ to: user.email, subject: 'Reset your password', ...layout('Reset your password', 'Use the button below to choose a new password.', 'Reset password', link, 'This link works for 30 minutes and only once. If you did not ask for it, ignore this email.') });
-};
-const passwordChanged = (user) =>
-  sendMail({ to: user.email, subject: 'Your password was changed', ...layout('Your password was changed', 'The password for your account was just changed and other devices were signed out.', null, null, 'If this was not you, reset your password right away.') });
-
-module.exports = { verifyEmail, resetPassword, passwordChanged };
+module.exports = { verifyEmail };

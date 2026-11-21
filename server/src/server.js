@@ -3,6 +3,7 @@ const fs = require('fs');
 const env = require('./config/env');
 const app = require('./app');
 const worker = require('./worker/publisher');
+const emailEngine = require('./email/engine');
 
 fs.mkdirSync(env.UPLOAD_ROOT, { recursive: true });
 
@@ -12,6 +13,7 @@ function onListening() {
   started = true;
   console.log(`Server listening on ${env.SCHEME}://${env.HOST}:${env.PORT}`);
   worker.start().catch((e) => console.error('Worker failed to start:', e.message));
+  try { emailEngine.start(); } catch (e) { console.error('Email engine failed to start:', e.message); }
 }
 function onListenError(err) {
   // never start a second worker against the same DB
@@ -33,4 +35,4 @@ if (env.HTTPS) {
 }
 server.requestTimeout = 0; // big uploads
 server.headersTimeout = 65000;
-process.on('SIGINT', () => { worker.stop(); process.exit(0); });
+process.on('SIGINT', () => { worker.stop(); emailEngine.stop(); process.exit(0); });

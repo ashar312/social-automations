@@ -158,12 +158,58 @@ function Sessions() {
   )
 }
 
+const TOGGLES = [
+  ['dailySummary', 'Daily summary', 'Every morning: which scheduled posts went out yesterday, and what is coming up today.'],
+  ['productTips', 'Tips and reminders', 'A nudge to schedule your first post, and a note when you have been away for a few days.'],
+  ['feedback', 'Feedback requests', 'One short question a few days after your first published post.'],
+]
+const zones = () => { try { return Intl.supportedValuesOf('timeZone') } catch { return [] } }
+
+function Notifications() {
+  const [prefs, setPrefs] = useState(null)
+  const [tz, setTz] = useState('')
+  const [s, run] = useSave()
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  useEffect(() => { api.get('/api/account/notifications').then((d) => { setPrefs(d.prefs); setTz(d.timezone) }).catch(() => setPrefs({})) }, [])
+  const save = (patch, msg) => run(async () => { const d = await api.patch('/api/account/notifications', patch); setPrefs(d.prefs); setTz(d.timezone) }, msg)
+  if (!prefs) return <div className="card p-5"><div className="skeleton h-24" aria-label="Loading" /></div>
+  const list = zones()
+  return (
+    <div id="notifications" className="card space-y-3 p-5">
+      <h2 className="card-title">Email notifications</h2>
+      <Msg s={s} />
+      <ul className="divide-y divide-line">
+        {TOGGLES.map(([key, label, help]) => (
+          <li key={key} className="flex items-start justify-between gap-4 py-3">
+            <div><div className="text-sm font-semibold text-ink">{label}</div><div className="text-sm text-muted">{help}</div></div>
+            <input type="checkbox" className="mt-1 h-5 w-5 accent-brand" checked={!!prefs[key]} disabled={s.busy} aria-label={label} onChange={(e) => save({ [key]: e.target.checked }, 'Saved')} />
+          </li>
+        ))}
+        <li className="flex items-start justify-between gap-4 py-3 opacity-70">
+          <div><div className="text-sm font-semibold text-ink">Account and security</div><div className="text-sm text-muted">Welcome, password reset, password changed and new connections. Always on.</div></div>
+          <input type="checkbox" className="mt-1 h-5 w-5" checked disabled aria-label="Account and security emails are always on" readOnly />
+        </li>
+      </ul>
+      <label className="block text-sm font-semibold text-ink">Time zone
+        <select className="field mt-1" value={tz} disabled={s.busy} onChange={(e) => save({ timezone: e.target.value }, 'Time zone saved')}>
+          {(list.includes(tz) ? list : [tz, ...list]).map((z) => <option key={z} value={z}>{z}</option>)}
+        </select>
+        <span className="mt-1 block text-xs font-normal text-muted">The daily summary arrives around 9 AM in this time zone.</span>
+      </label>
+      {browserTz && browserTz !== tz && (
+        <p className="text-sm text-muted">Your browser is in {browserTz}. <button type="button" className="font-semibold text-brand" onClick={() => save({ timezone: browserTz }, 'Time zone saved')}>Use it</button></p>
+      )}
+    </div>
+  )
+}
+
 export default function Settings() {
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <PageTitle eyebrow="Account" title="Settings" />
       <Profile />
       <Password />
+      <Notifications />
       <SignInMethods />
       <Sessions />
     </div>

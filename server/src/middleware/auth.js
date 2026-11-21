@@ -6,7 +6,11 @@ const { COOKIE, resolveSession } = require('../services/auth');
 async function loadUser(req, res, next) {
   try {
     const r = await resolveSession(req.cookies && req.cookies[COOKIE]);
-    if (r) { req.user = r.user; req.session = r.session; }
+    if (r) {
+      req.user = r.user; req.session = r.session;
+      const last = r.user.last_active_at;
+      if (!last || Date.now() - last.getTime() > 10 * 60000) r.user.update({ last_active_at: new Date() }).catch(() => {});
+    }
     next();
   } catch (e) { next(e); }
 }

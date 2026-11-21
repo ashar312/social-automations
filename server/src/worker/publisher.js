@@ -1,7 +1,7 @@
 'use strict';
 const { Op } = require('sequelize');
 const env = require('../config/env');
-const { Post, PostTarget, MediaFile, ActivityLog, PlatformAccount, Project } = require('../db/models');
+const { Post, PostTarget, MediaFile, ActivityLog, PlatformAccount, Project, User } = require('../db/models');
 const { syncSiblings } = require('../services/accounts');
 const adapters = require('../platforms');
 const { ensureFresh, testAccount } = require('../services/tokens');
@@ -81,6 +81,9 @@ async function runTarget(t) {
       error_message: null, error_raw: null, locked_at: null, finished_at: new Date(),
     });
     await log(t.id, 'info', `Published: ${res.url || res.externalId}`);
+    Project.findByPk(post.project_id, { attributes: ['user_id'] })
+      .then((pr) => pr && User.update({ first_post_published_at: new Date() }, { where: { id: pr.user_id, first_post_published_at: null } }))
+      .catch((e) => console.error('first_post_published_at:', e.message));
   } catch (e) {
     const err = e instanceof PublishError ? e : fromHttp(e);
     const attempts = t.attempts + 1;

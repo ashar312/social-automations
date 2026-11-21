@@ -36,7 +36,7 @@ function view(p, accounts = [], postCount = 0) {
   const worst = shown.reduce((w, a) => ((WORST[a.status] || 0) > (WORST[w] || 0) ? a.status : w), 'none');
   return {
     id: p.id, publicId: p.public_id, name: p.name, color: p.color, icon: p.icon, description: p.description, settings: p.settings || {},
-    archived: !!p.archived_at, createdAt: p.created_at,
+    archived: !!p.archived_at, createdAt: p.createdAt,
     apiKey: p.api_key_hash ? { hint: p.api_key_hint, createdAt: p.api_key_created_at, lastUsedAt: p.api_key_last_used_at } : null,
     connected: shown.map((a) => a.platform), connectedCount: shown.length, postCount, worstStatus: worst,
   };

@@ -7,6 +7,8 @@ const social = require('../services/socialAuth');
 const env = require('../config/env');
 const A = require('../services/auth');
 const emails = require('../services/emails');
+const ev = require('../email/events');
+const { validTimezone } = require('../email/time');
 const { requireUser } = require('../middleware/auth');
 
 const parse = (schema, body) => {
@@ -32,15 +34,15 @@ router.get('/providers', (req, res) => res.json({
   ok: true, email: true, linkedin: env.AUTH_LINKEDIN_ENABLED, facebook: env.AUTH_FACEBOOK_ENABLED, instagram: env.AUTH_INSTAGRAM_ENABLED,
 }));
 
-const signup = z.object({ name: z.string().trim().min(1, 'Name is required').max(100), email: z.string().trim().email('Enter a valid email').max(255), password: z.string() });
+const signup = z.object({ name: z.string().trim().min(1, 'Name is required').max(100), email: z.string().trim().email('Enter a valid email').max(255), password: z.string(), timezone: z.string().max(64).optional() });
 router.post('/signup', signupLimit, async (req, res, next) => {
   try {
     const d = parse(signup, req.body);
     A.validatePassword(d.password);
     const email = A.normEmail(d.email);
     if (await User.findOne({ where: { email } })) throw A.httpErr(409, 'An account with this email already exists');
-    const user = await User.create({ email, name: d.name, password_hash: await A.hashPassword(d.password) });
-    A.issueToken(user.id, 'verify_email').then((t) => emails.verifyEmail(user, t)).catch((e) => console.error('[auth] verify email:', e.message));
+    const user = await User.create({ email, name: d.name, password_hash: await A.hashPassword(d.password), ...(d.timezone && validTimezone(d.timezone) ? { timezone: d.timezone } : {}), last_active_at: new Date() });
+    ev.welcome(user); // welcome email, carries the verify link
     await A.createSession(user, req, res);
     res.status(201).json({ ok: true, user: await A.publicUser(user) });
   } catch (e) { next(e); }
@@ -75,7 +77,7 @@ router.post('/forgot-password', forgotIp, forgotEmail, async (req, res, next) =>
     const d = parse(z.object({ email: z.string() }), req.body);
     const user = await User.findOne({ where: { email: A.normEmail(d.email) } });
     if (user && !user.disabled_at) {
-      try { emails.resetPassword(user, await A.issueToken(user.id, 'reset_password')); } catch (e) { console.error('[auth] reset email:', e.message); }
+      try { await ev.resetPassword(user, await A.issueToken(user.id, 'reset_password')); } catch (e) { console.error('[auth] reset email:', e.message); }
     }
     res.json({ ok: true, message: 'If that email exists, we sent a link.' });
   } catch (e) { next(e); }
@@ -91,7 +93,7 @@ router.post('/reset-password', async (req, res, next) => {
     if (!user || user.disabled_at) throw A.httpErr(400, 'This link has expired or was already used');
     await user.update({ password_hash: await A.hashPassword(d.password) });
     await A.destroyOtherSessions(user.id);
-    emails.passwordChanged(user);
+    ev.passwordChanged(user, req);
     await A.createSession(user, req, res);
     res.json({ ok: true, user: await A.publicUser(user) });
   } catch (e) { next(e); }
@@ -123,7 +125,7 @@ router.post('/finish', signupLimit, async (req, res, next) => {
     if (!prof) throw A.httpErr(400, 'This step expired. Start again from the sign-in page.');
     const user = await social.finishSignup(prof.provider, prof, A.normEmail(d.email)); // on error the step stays open for another email
     social.dropPending(d.sel);
-    A.issueToken(user.id, 'verify_email').then((t) => emails.verifyEmail(user, t)).catch((e) => console.error('[auth] verify email:', e.message));
+    ev.welcome(user);
     await A.createSession(user, req, res);
     res.status(201).json({ ok: true, user: await A.publicUser(user) });
   } catch (e) { next(e); }
@@ -156,12 +158,13 @@ router.get('/:provider/callback', async (req, res) => {
     if (!row) return fail('Invalid sign-in state, please try again');
     mode = row.mode;
     await row.destroy();
-    if (Date.now() - new Date(row.created_at).getTime() > 600000) return fail('Sign-in expired, please try again');
+    if (Date.now() - new Date(row.createdAt).getTime() > 600000) return fail('Sign-in expired, please try again');
     if (mode === 'link' && (!req.user || req.user.id !== row.user_id)) return fail('Sign in again, then link from Settings');
     const prof = await p.profile(String(req.query.code));
-    const { user, linked, needsEmail } = await social.resolveUser(provider, prof, { mode, linkUser: req.user });
+    const { user, linked, needsEmail, created } = await social.resolveUser(provider, prof, { mode, linkUser: req.user });
     if (needsEmail) return res.redirect(`${env.CLIENT_URL}/auth/finish?${new URLSearchParams({ sel: social.stashPending({ ...prof, provider }), provider })}`);
     if (linked) return res.redirect(`${env.CLIENT_URL}/settings?linked=${provider}`);
+    if (created) ev.welcome(user);
     await A.createSession(user, req, res);
     res.redirect(`${env.CLIENT_URL}/`);
   } catch (e) {

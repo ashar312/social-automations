@@ -146,3 +146,9 @@ post_targets *───1 platform_accounts (one per platform per project; the wo
 
 Changed: `projects.user_id` NOT NULL FK (name is now UNIQUE per user: `user_id, name`), `media_files.user_id` FK, `oauth_states.user_id`.
 Everything else is owned through `project_id`. Migrations `20261122000001` and `20261122000002` (the second needs env `OWNER_PASSWORD`, then remove it).
+
+## Email engine tables (plan 09)
+
+- `email_outbox` (user_id, type, dedupe_key, to_email, priority, payload JSON, payload_secret encrypted + wiped after send, status, send_after, attempts, next_attempt_at, locked_at, sent_at, message_id, error; UNIQUE(user_id, type, dedupe_key))
+- `email_feedback` (user_id UNIQUE, rating 1-5, comment)
+- `users` gains `timezone`, `last_active_at`, `email_prefs` JSON, `first_post_published_at`

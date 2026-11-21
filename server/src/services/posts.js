@@ -198,7 +198,7 @@ function listView(p) {
   const media = (p.media || []).slice().sort((a, b) => a.position - b.position);
   return {
     id: p.id, projectId: p.project_id, contentType: p.content_type, caption: p.caption, title: p.title, status: p.status,
-    scheduledAt: p.scheduled_at, createdAt: p.created_at, createdVia: p.created_via || null,
+    scheduledAt: p.scheduled_at, createdAt: p.createdAt, createdVia: p.created_via || null,
     thumbnailMediaId: media[0] ? media[0].id : null,
     pageCount: media[0] && media[0].kind === 'document' ? media[0].page_count : null,
     targets: (p.targets || []).map(targetView),
@@ -251,7 +251,7 @@ async function getPost(project, id, { logLimit = 300, userId = null } = {}) {
     ...listView(p),
     media: p.media.sort((a, b) => a.position - b.position).map(mediaSvc.view),
     targets: p.targets.map((t) => ({ ...targetView(t), overrides: t.overrides, errorRaw: t.error_raw })),
-    logs: logs.reverse().map((l) => ({ id: Number(l.id), targetId: l.post_target_id, level: l.level, message: l.message, data: l.data, createdAt: l.created_at })),
+    logs: logs.reverse().map((l) => ({ id: Number(l.id), targetId: l.post_target_id, level: l.level, message: l.message, data: l.data, createdAt: l.createdAt })),
   };
 }
 

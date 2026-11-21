@@ -4,7 +4,7 @@ const { z } = require('zod');
 const { Op } = require('sequelize');
 const { UserSession, UserIdentity } = require('../db/models');
 const A = require('../services/auth');
-const emails = require('../services/emails');
+const ev = require('../email/events');
 
 const parse = (schema, body) => {
   const r = schema.safeParse(body);
@@ -37,15 +37,37 @@ router.post('/password', async (req, res, next) => {
     A.validatePassword(d.newPassword);
     await req.user.update({ password_hash: await A.hashPassword(d.newPassword) });
     await A.destroyOtherSessions(req.user.id, req.session.id);
-    emails.passwordChanged(req.user);
+    ev.passwordChanged(req.user, req);
     res.json({ ok: true, user: await A.publicUser(req.user) });
+  } catch (e) { next(e); }
+});
+
+// ---- Email notifications (plans/09-email-engine.md) ----
+const { getPrefs } = require('../email/prefs');
+const { validTimezone } = require('../email/time');
+router.get('/notifications', (req, res) => res.json({ ok: true, prefs: getPrefs(req.user), timezone: req.user.timezone }));
+router.patch('/notifications', async (req, res, next) => {
+  try {
+    const d = parse(z.object({
+      dailySummary: z.boolean().optional(), productTips: z.boolean().optional(), feedback: z.boolean().optional(), timezone: z.string().max(64).optional(),
+    }), req.body);
+    const patch = {};
+    const prefs = getPrefs(req.user);
+    for (const k of ['dailySummary', 'productTips', 'feedback']) if (d[k] !== undefined) prefs[k] = d[k];
+    patch.email_prefs = prefs;
+    if (d.timezone !== undefined) {
+      if (!validTimezone(d.timezone)) throw A.httpErr(400, 'Unknown time zone');
+      patch.timezone = d.timezone;
+    }
+    await req.user.update(patch);
+    res.json({ ok: true, prefs: getPrefs(req.user), timezone: req.user.timezone });
   } catch (e) { next(e); }
 });
 
 router.get('/sessions', async (req, res, next) => {
   try {
     const rows = await UserSession.findAll({ where: { user_id: req.user.id, expires_at: { [Op.gt]: new Date() } }, order: [['last_seen_at', 'DESC']] });
-    res.json({ ok: true, sessions: rows.map((s) => ({ id: s.id, userAgent: s.user_agent, ip: s.ip, lastSeenAt: s.last_seen_at, createdAt: s.created_at, current: s.id === req.session.id })) });
+    res.json({ ok: true, sessions: rows.map((s) => ({ id: s.id, userAgent: s.user_agent, ip: s.ip, lastSeenAt: s.last_seen_at, createdAt: s.createdAt, current: s.id === req.session.id })) });
   } catch (e) { next(e); }
 });
 router.delete('/sessions', async (req, res, next) => {

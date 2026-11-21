@@ -200,7 +200,7 @@ router.get('/:platform/callback', async (req, res) => {
       projectId = null;
       throw new Error('Sign in again and retry connecting');
     }
-    if (Date.now() - new Date(row.created_at).getTime() > 600000) throw new Error('OAuth state expired, please try again');
+    if (Date.now() - new Date(row.createdAt).getTime() > 600000) throw new Error('OAuth state expired, please try again');
     const out = await p.callback(String(req.query.code), row.code_verifier, projectId, row.user_id);
     res.redirect(clientDone(out, projectId));
   } catch (e) {
