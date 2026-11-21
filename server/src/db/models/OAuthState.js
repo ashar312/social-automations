@@ -4,4 +4,5 @@ module.exports = (s, T) => s.define('OAuthState', {
   platform: { type: T.ENUM('linkedin', 'youtube', 'facebook', 'instagram', 'meta'), allowNull: false },
   code_verifier: T.STRING(128),
   project_id: T.INTEGER,
+  user_id: T.INTEGER, // who started the connect flow
 }, { tableName: 'oauth_states', underscored: true, updatedAt: false });

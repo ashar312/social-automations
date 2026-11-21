@@ -41,8 +41,9 @@ const hexRgb = (hex) => {
  * uploaded through this project (same rule as apiInput in services/posts.js). UI uploads have no project yet.
  */
 async function loadSlides(ids, projectId, api) {
-  const { MediaFile } = require('../db/models');
-  const rows = await MediaFile.findAll({ where: { id: [...new Set(ids)] } });
+  const { MediaFile, Project } = require('../db/models');
+  const owner = projectId ? (await Project.findByPk(projectId, { attributes: ['user_id'] }))?.user_id : null;
+  const rows = (await MediaFile.findAll({ where: { id: [...new Set(ids)] } })).filter((r) => r.user_id === owner); // other users' media = unknown
   const byId = new Map(rows.map((r) => [r.id, r]));
   const foreign = ids.filter((i) => {
     const r = byId.get(i);

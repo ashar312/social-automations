@@ -101,3 +101,10 @@ LinkedIn doesn't offer webhooks to self-serve apps. Publishing is synchronous, a
 | `redirect_uri mismatch` | The URL in the Auth tab must match the env value exactly (http vs https, trailing slash) |
 | `426 / version not supported` | Bump `LINKEDIN_API_VERSION` |
 | `401` after ~60 days | Token expired. Reconnect |
+
+## Sign in with LinkedIn (user accounts, plan 08)
+
+Signing in to this app with LinkedIn is separate from connecting LinkedIn to a project.
+
+1. **Products:** make sure **Sign In with LinkedIn using OpenID Connect** is added (the connect flow already needs `openid profile email`).
+2. **Auth, Authorized redirect URLs:** add `AUTH_LINKEDIN_REDIRECT_URI` from `server/.env`, for example `https://localhost:5000/api/auth/linkedin/callback`. Keep the existing `/api/oauth/linkedin/callback` entry.

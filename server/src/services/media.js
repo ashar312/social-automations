@@ -114,16 +114,18 @@ async function inspectPdf(absPath) {
  * `projectId` scopes the upload to one project (external API / MCP); null for UI uploads.
  * Deletes the file again if anything fails.
  */
-async function ingest(absPath, originalName, { projectId = null } = {}) {
-  const { MediaFile } = require('../db/models');
+async function ingest(absPath, originalName, { projectId = null, userId = null } = {}) {
+  const { MediaFile, Project } = require('../db/models');
   try {
+    if (!userId && projectId) userId = (await Project.findByPk(projectId, { attributes: ['user_id'] }))?.user_id || null;
+    if (!userId) throw bad('Upload has no owner');
     let ext = path.extname(absPath).toLowerCase();
     const kind = kindOf(ext);
     if (kind === 'document') { // no ffprobe, no thumbnail
       const info = await inspectPdf(absPath);
       const stat = await fs.promises.stat(absPath);
       const row = await MediaFile.create({
-        project_id: projectId, kind, original_name: originalName, stored_path: path.relative(env.UPLOAD_ROOT, absPath).split(path.sep).join('/'),
+        project_id: projectId, user_id: userId, kind, original_name: originalName, stored_path: path.relative(env.UPLOAD_ROOT, absPath).split(path.sep).join('/'),
         public_token: crypto.randomBytes(16).toString('hex'), mime_type: MIME[ext], size_bytes: stat.size,
         width: info.width, height: info.height, page_count: info.pageCount,
       });
@@ -144,7 +146,7 @@ async function ingest(absPath, originalName, { projectId = null } = {}) {
     if (kind === 'video') await makeThumbnail(rel);
 
     const row = await MediaFile.create({
-      project_id: projectId, kind, original_name: originalName, stored_path: rel, public_token: crypto.randomBytes(16).toString('hex'),
+      project_id: projectId, user_id: userId, kind, original_name: originalName, stored_path: rel, public_token: crypto.randomBytes(16).toString('hex'),
       mime_type: MIME[ext], size_bytes: stat.size, width: info.width, height: info.height,
       duration_sec: kind === 'video' && info.duration != null ? info.duration.toFixed(2) : null,
     });

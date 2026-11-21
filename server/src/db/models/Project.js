@@ -5,7 +5,8 @@ module.exports = (s, T) => s.define('Project', {
   id: { type: T.INTEGER, autoIncrement: true, primaryKey: true },
   // Stable id used by the external API (/api/v1/projects/:publicId). Never changes, never reused.
   public_id: { type: T.STRING(32), allowNull: false, unique: true, defaultValue: () => `prj_${crypto.randomBytes(8).toString('hex')}` },
-  name: { type: T.STRING(100), allowNull: false, unique: true },
+  user_id: { type: T.INTEGER, allowNull: false },
+  name: { type: T.STRING(100), allowNull: false }, // unique per user (user_id, name)
   color: { type: T.STRING(16), allowNull: false, defaultValue: '#7c5cff' },
   icon: T.STRING(32),
   description: T.STRING(500),

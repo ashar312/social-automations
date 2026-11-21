@@ -135,3 +135,14 @@ post_targets *───1 platform_accounts (one per platform per project; the wo
 - Some published, some `failed` → `partial`
 - Every non-skipped target `failed` → `failed`
 - Any target `pending`, `uploading` or `processing` → `publishing`
+
+## Auth tables (plan 08)
+
+- `users` (email unique, email_verified_at, password_hash NULL for social-only, name, phone, avatar_url, last_login_at, disabled_at)
+- `user_identities` (user_id, provider linkedin|facebook|instagram, provider_user_id; UNIQUE provider+provider_user_id and user_id+provider)
+- `user_sessions` (user_id, token_hash sha256 UNIQUE, expires_at, last_seen_at, user_agent, ip)
+- `auth_tokens` (user_id, purpose reset_password|verify_email, token_hash sha256 UNIQUE, expires_at, used_at)
+- `auth_oauth_states` (state, provider, code_verifier, nonce, mode login|link, user_id)
+
+Changed: `projects.user_id` NOT NULL FK (name is now UNIQUE per user: `user_id, name`), `media_files.user_id` FK, `oauth_states.user_id`.
+Everything else is owned through `project_id`. Migrations `20261122000001` and `20261122000002` (the second needs env `OWNER_PASSWORD`, then remove it).

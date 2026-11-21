@@ -40,10 +40,11 @@ const bodySchema = z.object({
   scheduledAt: z.string().datetime({ offset: true }).nullish().describe('ISO 8601 with a UTC offset, e.g. "2026-11-25T09:00:00+05:00". Used when publishNow is false'),
 });
 
-async function loadMedia(ids) {
+async function loadMedia(ids, userId) {
   if (!ids.length) return [];
   const rows = await MediaFile.findAll({ where: { id: ids } });
-  const byId = new Map(rows.map((r) => [r.id, r]));
+  // media of another user is reported as unknown, same as a missing id
+  const byId = new Map(rows.filter((r) => r.user_id === userId).map((r) => [r.id, r]));
   const missing = ids.filter((i) => !byId.has(i));
   if (missing.length) throw fail(400, `Unknown media id(s): ${missing.join(', ')}`);
   return ids.map((i) => byId.get(i));
@@ -64,7 +65,7 @@ async function check(raw, projectId) {
     body.caption = add(body.caption);
     for (const t of body.targets) if (t.overrides && typeof t.overrides.caption === 'string') t.overrides = { ...t.overrides, caption: add(t.overrides.caption) };
   }
-  const media = await loadMedia(body.mediaIds);
+  const media = await loadMedia(body.mediaIds, project && project.user_id);
   const accounts = await PlatformAccount.findAll({ where: { project_id: projectId } });
   const live = accounts.filter((a) => a.status !== 'expired');
   const connected = new Set(live.map((a) => a.platform));
@@ -170,7 +171,7 @@ async function createPost(project, raw, { api = false, via = null } = {}) {
   // Cross-post: one separate post per extra project. Best effort; failures are reported, not fatal.
   const also = [];
   for (const pid of [...new Set(body.alsoProjects)].filter((x) => x !== project.id)) {
-    const proj = await Project.findByPk(pid);
+    const proj = await Project.findOne({ where: { id: pid, user_id: project.user_id } });
     try {
       if (!proj || proj.archived_at) throw new Error('Project not found or archived');
       const c = await check(input, pid);
@@ -205,10 +206,14 @@ function listView(p) {
 }
 
 /** One project's posts, or every project's when `project` is null. Returns { page, total, posts }. */
-async function listPosts(project, query = {}) {
+async function listPosts(project, query = {}, { userId = null } = {}) {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(50, Math.max(1, Number(query.limit) || 20));
   const where = project ? { project_id: project.id } : {};
+  if (!project) {
+    const mine = await Project.findAll({ where: { user_id: userId }, attributes: ['id'] });
+    where.project_id = mine.map((p) => p.id);
+  }
   if (query.status) where.status = query.status;
   const include = [{ model: PostTarget, as: 'targets', required: !!query.platform, where: query.platform ? { platform: query.platform } : undefined },
     { model: MediaFile, as: 'media', required: false }];
@@ -225,16 +230,21 @@ async function listPosts(project, query = {}) {
 }
 
 /** Loads a post; with a project, it must belong to it (404 otherwise). */
-async function findPost(project, id, include) {
+async function findPost(project, id, include, userId = null) {
   const n = Number(id);
   const p = Number.isInteger(n) && n > 0 ? await Post.findByPk(n, include ? { include } : undefined) : null;
   if (!p || (project && p.project_id !== project.id)) throw fail(404, project ? 'Post not found in this project' : 'Not found');
+  if (!project) {
+    // global UI routes: the post's project must belong to the signed-in user
+    const owner = await Project.count({ where: { id: p.project_id, user_id: userId } });
+    if (!owner) throw fail(404, 'Not found');
+  }
   return p;
 }
 
 /** Full post with media, targets and (newest `logLimit`, oldest first) log lines. */
-async function getPost(project, id, { logLimit = 300 } = {}) {
-  const p = await findPost(project, id, ['targets', { model: MediaFile, as: 'media' }]);
+async function getPost(project, id, { logLimit = 300, userId = null } = {}) {
+  const p = await findPost(project, id, ['targets', { model: MediaFile, as: 'media' }], userId);
   const ids = p.targets.map((t) => t.id);
   const logs = ids.length && logLimit > 0 ? await ActivityLog.findAll({ where: { post_target_id: ids }, order: [['id', 'DESC']], limit: logLimit }) : [];
   return {
@@ -246,8 +256,8 @@ async function getPost(project, id, { logLimit = 300 } = {}) {
 }
 
 /** Puts a failed/pending platform target back in the queue. */
-async function retryTarget(project, id, platform) {
-  const p = await findPost(project, id);
+async function retryTarget(project, id, platform, userId = null) {
+  const p = await findPost(project, id, undefined, userId);
   const t = await PostTarget.findOne({ where: { post_id: p.id, platform } });
   if (!t) throw fail(404, `This post has no ${platform} target`);
   if (t.status === 'published') throw fail(400, 'Already published');
@@ -257,10 +267,10 @@ async function retryTarget(project, id, platform) {
 }
 
 /** Deletes a post (and its media files); `remote` also deletes it on the platforms that allow it. Returns { remote: [...] }. */
-async function deletePost(project, id, { remote = false } = {}) {
+async function deletePost(project, id, { remote = false, userId = null } = {}) {
   const adapters = require('../platforms');
   const { ensureFresh } = require('./tokens');
-  const p = await findPost(project, id, ['targets', { model: MediaFile, as: 'media' }]);
+  const p = await findPost(project, id, ['targets', { model: MediaFile, as: 'media' }], userId);
   const out = [];
   if (remote) {
     for (const t of p.targets.filter((x) => x.status === 'published' && x.external_id)) {

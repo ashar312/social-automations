@@ -3,18 +3,21 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { FaFolderPlus } from 'react-icons/fa6'
 import { api } from '../api.js'
 import { Notice } from '../components/ui.jsx'
+import { useAuth } from '../auth/useAuth.js'
 import { ProjectContext } from './useProject.js'
 import { ProjectForm } from './ProjectForm.jsx'
 
-const KEY = 'sa.activeProject'
-const readId = () => { try { return Number(localStorage.getItem(KEY)) || null } catch { return null } }
-const writeId = (id) => { try { localStorage.setItem(KEY, String(id)) } catch { /* the choice just will not survive a reload */ } }
+// keyed per user so switching accounts in one browser never selects someone else's project id
+const readId = (key) => { try { return Number(localStorage.getItem(key)) || null } catch { return null } }
+const writeId = (key, id) => { try { localStorage.setItem(key, String(id)) } catch { /* the choice just will not survive a reload */ } }
 
 export function ProjectProvider({ children }) {
+  const { user } = useAuth()
+  const KEY = `sa.activeProject.${user.id}`
   const nav = useNavigate()
   const { pathname, search } = useLocation()
   const [projects, setProjects] = useState(null)
-  const [activeId, setActiveId] = useState(readId)
+  const [activeId, setActiveId] = useState(() => readId(KEY))
   const [loadError, setLoadError] = useState('')
 
   const reload = useCallback(() => api.get('/api/projects').then((d) => {
@@ -23,7 +26,7 @@ export function ProjectProvider({ children }) {
   }).catch((e) => setLoadError(e.message)), [])
   useEffect(() => { reload() }, [reload])
 
-  const setActive = useCallback((id) => { writeId(id); setActiveId(id) }, [])
+  const setActive = useCallback((id) => { writeId(KEY, id); setActiveId(id) }, [KEY])
 
   // OAuth returns with ?project=<id>: switch to it and strip the param
   useEffect(() => {

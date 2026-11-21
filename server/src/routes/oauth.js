@@ -7,6 +7,7 @@ const { Op } = require('sequelize');
 const env = require('../config/env');
 const { OAuthState, Project, PlatformAccount } = require('../db/models');
 const { upsertAccount } = require('../services/accounts');
+const { requireUser } = require('../middleware/auth');
 
 const clientDone = (q, projectId) => `${env.CLIENT_URL}/connections?${new URLSearchParams(projectId ? { ...q, project: String(projectId) } : q)}`;
 const GV = env.META_GRAPH_VERSION;
@@ -87,7 +88,7 @@ const providers = {
         state, scope: LI_SCOPE(),
       });
     },
-    async callback(code, verifier, projectId) {
+    async callback(code, verifier, projectId, userId) {
       const { data: t } = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', new URLSearchParams({
         grant_type: 'authorization_code', code, redirect_uri: env.LINKEDIN_REDIRECT_URI,
         client_id: env.LINKEDIN_CLIENT_ID, client_secret: env.LINKEDIN_CLIENT_SECRET,
@@ -96,7 +97,7 @@ const providers = {
       const options = [{ id: `urn:li:person:${me.sub}`, name: `${me.name || me.email || me.sub} (personal profile)`, avatar: me.picture }];
       if (LI_ORG()) options.push(...await linkedinOrgs(t.access_token));
       const ctx = {
-        projectId, options, scopes: t.scope || LI_SCOPE().replace(/ /g, ' '),
+        projectId, userId, options, scopes: t.scope || LI_SCOPE().replace(/ /g, ' '),
         token: t.access_token, refreshToken: t.refresh_token,
         expiresAt: new Date(Date.now() + (t.expires_in || 5184000) * 1000),
       };
@@ -142,7 +143,7 @@ const providers = {
         scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management',
       });
     },
-    async callback(code, verifier, projectId) {
+    async callback(code, verifier, projectId, userId) {
       const g = (p, params) => axios.get(`https://graph.facebook.com/${GV}${p}`, { params }).then((r) => r.data);
       const short = await g('/oauth/access_token', {
         client_id: env.META_APP_ID, client_secret: env.META_APP_SECRET, redirect_uri: env.META_REDIRECT_URI, code,
@@ -156,7 +157,7 @@ const providers = {
       })).data || [];
       if (!pages.length) throw new Error('No Facebook Pages found for this user');
       const scopes = 'pages_show_list pages_read_engagement pages_manage_posts instagram_basic instagram_content_publish business_management';
-      const ctx = { pages, scopes, projectId };
+      const ctx = { pages, scopes, projectId, userId };
       if (pages.length === 1) {
         await saveMetaPage(ctx, pages[0].id);
         return { connected: 'facebook,instagram' };
@@ -168,16 +169,17 @@ const providers = {
 
 router.get('/:platform/start', async (req, res, next) => {
   try {
+    if (!req.user) return res.redirect(`${env.CLIENT_URL}/login`);
     const p = providers[req.params.platform];
     if (!p) return res.status(404).json({ ok: false, error: 'Unknown platform' });
     const projectId = /^\d+$/.test(String(req.query.project || '')) ? Number(req.query.project) : null;
-    const project = projectId && await Project.findByPk(projectId);
+    const project = projectId && await Project.findOne({ where: { id: projectId, user_id: req.user.id } });
     if (!project || project.archived_at) return res.status(400).json({ ok: false, error: 'Pick an active project first (?project=<id>)' });
     if (!p.configured()) return res.redirect(clientDone({ error: `${req.params.platform} credentials are missing in server/.env` }, project.id));
     await OAuthState.destroy({ where: { created_at: { [Op.lt]: new Date(Date.now() - 600000) } } });
     const state = crypto.randomBytes(32).toString('hex');
     const verifier = p.pkce ? b64url(crypto.randomBytes(48)) : null;
-    await OAuthState.create({ state, platform: req.params.platform, code_verifier: verifier, project_id: project.id });
+    await OAuthState.create({ state, platform: req.params.platform, code_verifier: verifier, project_id: project.id, user_id: req.user.id });
     res.redirect(p.authUrl(state, verifier));
   } catch (e) { next(e); }
 });
@@ -193,8 +195,13 @@ router.get('/:platform/callback', async (req, res) => {
     if (!row) throw new Error('Invalid OAuth state, please try connecting again');
     projectId = row.project_id;
     await row.destroy();
+    // the user who started the flow must still be signed in and still own the project
+    if (!req.user || req.user.id !== row.user_id || !(await Project.count({ where: { id: row.project_id, user_id: row.user_id } }))) {
+      projectId = null;
+      throw new Error('Sign in again and retry connecting');
+    }
     if (Date.now() - new Date(row.created_at).getTime() > 600000) throw new Error('OAuth state expired, please try again');
-    const out = await p.callback(String(req.query.code), row.code_verifier, projectId);
+    const out = await p.callback(String(req.query.code), row.code_verifier, projectId, row.user_id);
     res.redirect(clientDone(out, projectId));
   } catch (e) {
     const msg = e.response?.data?.error_description || e.response?.data?.error?.message || e.message;
@@ -204,20 +211,20 @@ router.get('/:platform/callback', async (req, res) => {
 });
 
 // Meta page picker (when the user manages more than one Page)
-router.get('/meta/pages', async (req, res, next) => {
+router.get('/meta/pages', requireUser, async (req, res, next) => {
   try {
   const s = pending.get(String(req.query.sel));
-  if (!s) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
+  if (!s || s.userId !== req.user.id) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
   res.json({ ok: true, pages: await Promise.all(s.pages.map(async (p) => ({
     id: p.id, name: p.name,
-    usedIn: (await PlatformAccount.findAll({ where: { platform: 'facebook', external_id: p.id, project_id: { [Op.ne]: s.projectId } }, include: [{ model: Project, as: 'project', attributes: ['name'] }] })).map((a) => a.project.name),
+    usedIn: (await PlatformAccount.findAll({ where: { platform: 'facebook', external_id: p.id, project_id: { [Op.ne]: s.projectId } }, include: [{ model: Project, as: 'project', attributes: ['name'], where: { user_id: req.user.id } }] })).map((a) => a.project.name),
   }))) });
   } catch (e) { next(e); }
 });
-router.post('/meta/select', async (req, res, next) => {
+router.post('/meta/select', requireUser, async (req, res, next) => {
   try {
     const s = pending.get(String(req.body.sel));
-    if (!s) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
+    if (!s || s.userId !== req.user.id) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
     const r = await saveMetaPage(s, String(req.body.pageId));
     pending.delete(String(req.body.sel));
     res.json({ ok: true, ...r });
@@ -225,15 +232,15 @@ router.post('/meta/select', async (req, res, next) => {
 });
 
 // LinkedIn account picker (personal profile vs Company Pages)
-router.get('/linkedin/accounts', (req, res) => {
+router.get('/linkedin/accounts', requireUser, (req, res) => {
   const s = pending.get(String(req.query.sel));
-  if (!s) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
+  if (!s || s.userId !== req.user.id) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
   res.json({ ok: true, accounts: s.options.map((o) => ({ id: o.id, name: o.name })) });
 });
-router.post('/linkedin/select', async (req, res, next) => {
+router.post('/linkedin/select', requireUser, async (req, res, next) => {
   try {
     const s = pending.get(String(req.body.sel));
-    if (!s) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
+    if (!s || s.userId !== req.user.id) return res.status(404).json({ ok: false, error: 'Selection expired, reconnect' });
     await saveLinkedin(s, String(req.body.id));
     pending.delete(String(req.body.sel));
     res.json({ ok: true });

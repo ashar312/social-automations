@@ -1,9 +1,11 @@
 'use strict';
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const morgan = require('morgan');
 const env = require('./config/env');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
+const { loadUser, requireUser, checkOrigin } = require('./middleware/auth');
 const { router: mediaRouter, publicRouter } = require('./routes/media');
 
 const app = express();
@@ -19,11 +21,11 @@ if (env.PUBLIC_BASE_URL) {
     next();
   });
 }
-// The UI routes have no login. When HOST exposes the server to the network, only the
+// UI routes are behind login now; by default they are still loopback-only (UI_REMOTE_ACCESS=true lifts that). When HOST exposes the server to the network, only the
 // key-protected external API (/api/v1) and public media are reachable from other machines.
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 app.use((req, res, next) => {
-  if (LOOPBACK.has(req.socket.remoteAddress) || isApi(req.path) || req.path.startsWith('/media/')) return next();
+  if (env.UI_REMOTE_ACCESS || LOOPBACK.has(req.socket.remoteAddress) || isApi(req.path) || req.path.startsWith('/media/')) return next();
   res.status(404).end();
 });
 app.use('/media', publicRouter);
@@ -36,14 +38,19 @@ app.use(express.json({ limit: '1mb' }));
 // External API: any origin (auth is the per-project API key, no cookies)
 app.use('/api/v1', cors(), require('./routes/v1'));
 
-app.use(cors({ origin: env.CLIENT_URL }));
+app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+app.use(cookieParser());
+app.use('/api', loadUser, checkOrigin);
 app.use('/api/health', require('./routes/health'));
+app.use('/api/auth', require('./routes/auth'));
+// OAuth callbacks are browser redirects from the provider; routes/oauth.js applies requireUser itself on start/picker endpoints.
 app.use('/api/oauth', require('./routes/oauth'));
-app.use('/api/projects', require('./routes/projects'));
-app.use('/api/connections', require('./routes/connections').global);
-app.use('/api/media', mediaRouter);
-app.use('/api/posts', require('./routes/posts'));
-app.get('/api/config', (req, res) => res.json({
+app.use('/api/account', requireUser, require('./routes/account'));
+app.use('/api/projects', requireUser, require('./routes/projects'));
+app.use('/api/connections', requireUser, require('./routes/connections').global);
+app.use('/api/media', requireUser, mediaRouter);
+app.use('/api/posts', requireUser, require('./routes/posts'));
+app.get('/api/config', requireUser, (req, res) => res.json({
   ok: true, youtubeAudited: env.YOUTUBE_AUDITED, publicUrlConfigured: !!env.PUBLIC_BASE_URL, rules: require('./platforms/rules').RULES,
   api: {
     localBase: `${env.SERVER_URL.replace(/\/$/, '')}/api/v1`,

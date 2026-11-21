@@ -35,6 +35,13 @@ async function upsertAccount(projectId, platform, d) {
  * The same account (platform + external_id) can be connected in several projects, one row each.
  * Copy token fields and status from `row` to the others, so a reconnect or refresh in one project covers all.
  */
+/** Ids of every project owned by the same user as `projectId` (accounts are never shared across users). */
+async function sameUserProjectIds(projectId) {
+  const p = await Project.findByPk(projectId, { attributes: ['user_id'] });
+  if (!p) return [];
+  return (await Project.findAll({ where: { user_id: p.user_id }, attributes: ['id'] })).map((x) => x.id);
+}
+
 async function syncSiblings(row) {
   const [n] = await PlatformAccount.update({
     access_token_enc: row.access_token_enc,
@@ -43,7 +50,7 @@ async function syncSiblings(row) {
     scopes: row.scopes,
     status: row.status,
     last_checked_at: row.last_checked_at,
-  }, { where: { platform: row.platform, external_id: row.external_id, id: { [Op.ne]: row.id } } });
+  }, { where: { platform: row.platform, external_id: row.external_id, id: { [Op.ne]: row.id }, project_id: await sameUserProjectIds(row.project_id) } });
   return n;
 }
 
@@ -52,7 +59,7 @@ async function sharedWithMap(rows) {
   const out = new Map();
   for (const r of rows) {
     const sibs = await PlatformAccount.findAll({
-      where: { platform: r.platform, external_id: r.external_id, id: { [Op.ne]: r.id } },
+      where: { platform: r.platform, external_id: r.external_id, id: { [Op.ne]: r.id }, project_id: await sameUserProjectIds(r.project_id) },
       include: [{ model: Project, as: 'project', attributes: ['name'] }],
     });
     out.set(r.id, sibs.map((x) => x.project.name));

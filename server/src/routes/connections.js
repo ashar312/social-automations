@@ -10,7 +10,7 @@ const PLATFORMS = PlatformAccount.PLATFORMS;
 const global = express.Router();
 global.get('/alerts', async (req, res, next) => {
   try {
-    const rows = await PlatformAccount.findAll({ include: [{ model: Project, as: 'project', where: { archived_at: null } }] });
+    const rows = await PlatformAccount.findAll({ include: [{ model: Project, as: 'project', where: { archived_at: null, user_id: req.user.id } }] });
     const alerts = [];
     for (const r of rows) {
       const v = publicView(r);

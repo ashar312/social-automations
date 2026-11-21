@@ -27,7 +27,7 @@ const upload = multer({
 const handleUpload = [upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, error: 'No file received (field name must be "file")' });
-    res.json({ ok: true, ...(await m.ingest(req.file.path, req.file.originalname, { projectId: req.project ? req.project.id : null })) });
+    res.json({ ok: true, ...(await m.ingest(req.file.path, req.file.originalname, { projectId: req.project ? req.project.id : null, userId: req.user ? req.user.id : null })) });
   } catch (e) { next(e); }
 }];
 router.post('/', handleUpload);
@@ -39,6 +39,7 @@ const fileHeaders = (r) => (r.kind === 'document'
 
 async function find(req, res) {
   const r = await MediaFile.findByPk(req.params.id);
+  if (r && r.user_id !== req.user.id) { res.status(404).json({ ok: false, error: 'Not found' }); return null; }
   if (!r) res.status(404).json({ ok: false, error: 'Not found' });
   return r;
 }

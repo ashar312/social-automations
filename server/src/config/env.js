@@ -46,6 +46,24 @@ const schema = z.object({
   MCP_RATE_PER_MIN: z.coerce.number().int().positive().default(60),
   MCP_POSTS_PER_HOUR: z.coerce.number().int().positive().default(20),
   // Local HTTPS (plans/06-local-https.md). Both empty = plain HTTP. Paths relative to server/.
+  // Auth + email (plans/08-user-accounts-auth.md)
+  SESSION_DAYS: z.coerce.number().int().positive().default(30),
+  AUTH_LINKEDIN_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+  AUTH_LINKEDIN_REDIRECT_URI: z.string().default('http://localhost:5000/api/auth/linkedin/callback'),
+  AUTH_FACEBOOK_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  AUTH_FACEBOOK_REDIRECT_URI: z.string().default('http://localhost:5000/api/auth/facebook/callback'),
+  AUTH_INSTAGRAM_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  AUTH_INSTAGRAM_REDIRECT_URI: z.string().default('http://localhost:5000/api/auth/instagram/callback'),
+  // Instagram sign-in uses its own app id/secret (Instagram API with Instagram Login), not META_APP_*
+  INSTAGRAM_APP_ID: opt,
+  INSTAGRAM_APP_SECRET: opt,
+  UI_REMOTE_ACCESS: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  SMTP_HOST: opt,
+  SMTP_PORT: z.coerce.number().int().default(465),
+  SMTP_USER: opt,
+  SMTP_PASS: opt,
+  SMTP_FROM: opt,
+  SMTP_FROM_NAME: z.string().default('Social Automations'),
   TLS_CERT_FILE: opt,
   TLS_KEY_FILE: opt,
 });

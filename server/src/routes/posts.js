@@ -18,19 +18,19 @@ scoped.post('/', wrap(async (req, res) => {
 }));
 
 // Lists one project's posts (scoped) or every project's (GET /api/posts).
-const list = wrap(async (req, res) => res.json({ ok: true, ...(await svc.listPosts(req.project || null, req.query)) }));
+const list = wrap(async (req, res) => res.json({ ok: true, ...(await svc.listPosts(req.project || null, req.query, { userId: req.user.id })) }));
 scoped.get('/', list);
 router.get('/', list);
 
-router.get('/:id', wrap(async (req, res) => res.json({ ok: true, post: await svc.getPost(null, req.params.id) })));
+router.get('/:id', wrap(async (req, res) => res.json({ ok: true, post: await svc.getPost(null, req.params.id, { userId: req.user.id }) })));
 
 router.post('/:id/targets/:platform/retry', wrap(async (req, res) => {
-  await svc.retryTarget(null, req.params.id, req.params.platform);
+  await svc.retryTarget(null, req.params.id, req.params.platform, req.user.id);
   res.json({ ok: true });
 }));
 
 router.delete('/:id', wrap(async (req, res) => {
-  res.json({ ok: true, ...(await svc.deletePost(null, req.params.id, { remote: req.query.remote === 'true' })) });
+  res.json({ ok: true, ...(await svc.deletePost(null, req.params.id, { remote: req.query.remote === 'true', userId: req.user.id })) });
 }));
 
 module.exports = router;

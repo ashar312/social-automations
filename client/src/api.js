@@ -6,6 +6,7 @@ async function req(method, url, body) {
   })
   let data = null
   try { data = await res.json() } catch { /* empty body */ }
+  if (res.status === 401 && data?.code === 'AUTH_REQUIRED') window.dispatchEvent(new Event('auth:expired'))
   if (!res.ok || (data && data.ok === false)) {
     const err = new Error((data && (data.error || data.message)) || `Request failed (${res.status})`)
     err.data = data
@@ -31,7 +32,10 @@ export function uploadMedia(file, onProgress) {
       let d = null
       try { d = JSON.parse(xhr.responseText) } catch { /* ignore */ }
       if (xhr.status >= 200 && xhr.status < 300 && d?.ok) resolve(d)
-      else reject(new Error(d?.error || `Upload failed (${xhr.status})`))
+      else {
+        if (xhr.status === 401 && d?.code === 'AUTH_REQUIRED') window.dispatchEvent(new Event('auth:expired'))
+        reject(new Error(d?.error || `Upload failed (${xhr.status})`))
+      }
     }
     xhr.onerror = () => reject(new Error('Network error during upload'))
     const fd = new FormData()

@@ -5,15 +5,15 @@ import '@fontsource-variable/inter/index.css'
 import './index.css'
 import App from './App.jsx'
 import { ConfirmProvider } from './components/ConfirmProvider.jsx'
-import { ProjectProvider } from './projects/ProjectProvider.jsx'
+import { AuthProvider } from './auth/AuthProvider.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <ConfirmProvider>
-        <ProjectProvider>
+        <AuthProvider>
           <App />
-        </ProjectProvider>
+        </AuthProvider>
       </ConfirmProvider>
     </BrowserRouter>
   </StrictMode>,

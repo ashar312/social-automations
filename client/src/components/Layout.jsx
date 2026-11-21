@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom'
-import { FaCheck, FaChevronDown, FaClockRotateLeft, FaCode, FaFolder, FaPenNib, FaPlug, FaPlus, FaTableCellsLarge } from 'react-icons/fa6'
+import { FaArrowRightFromBracket, FaCheck, FaChevronDown, FaClockRotateLeft, FaCode, FaFolder, FaGear, FaPenNib, FaPlug, FaPlus, FaTableCellsLarge } from 'react-icons/fa6'
 import { api, PLATFORM_LABEL } from '../api.js'
 import { useProject } from '../projects/useProject.js'
+import { useAuth } from '../auth/useAuth.js'
 import { Notice } from './ui.jsx'
 
 const links = [
@@ -77,6 +78,58 @@ function ProjectSwitcher() {
   )
 }
 
+function UserMenu() {
+  const { user, logout } = useAuth()
+  const nav = useNavigate()
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const close = (e) => { if (e.type === 'keydown' ? e.key === 'Escape' : !ref.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close) }
+  }, [open])
+  const initials = user.name.split(/s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="Account menu"
+        className="flex w-full items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2 text-left shadow-card hover:border-line-strong">
+        {user.avatarUrl
+          ? <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" referrerPolicy="no-referrer" />
+          : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand" aria-hidden="true">{initials}</span>}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold leading-tight text-ink">{user.name}</span>
+          <span className="block truncate text-xs leading-tight text-muted">{user.email}</span>
+        </span>
+      </button>
+      {open && (
+        <div role="menu" className="card absolute bottom-full left-0 right-0 z-50 mb-2 min-w-48 space-y-0.5 p-1.5 shadow-lift lg:bottom-full">
+          <button role="menuitem" onClick={() => { setOpen(false); nav('/settings') }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink hover:bg-sunken"><FaGear className="text-xs" aria-hidden="true" />Settings</button>
+          <button role="menuitem" onClick={() => { setOpen(false); logout() }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink hover:bg-sunken"><FaArrowRightFromBracket className="text-xs" aria-hidden="true" />Sign out</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VerifyBanner() {
+  const { user } = useAuth()
+  const [msg, setMsg] = useState('')
+  if (user.emailVerified) return null
+  const resend = () => api.post('/api/auth/resend-verification').then(() => setMsg('Sent. Check your inbox.')).catch((e) => setMsg(e.message))
+  return (
+    <div className="mx-auto mt-5 max-w-5xl px-4 sm:px-8">
+      <Notice tone="warn">
+        <span className="flex flex-wrap items-center justify-between gap-2">
+          <span>Verify your email address ({user.email}).</span>
+          {msg ? <span>{msg}</span> : <button onClick={resend} className="font-semibold underline">Resend link</button>}
+        </span>
+      </Notice>
+    </div>
+  )
+}
+
 function Brand() {
   return (
     <Link to="/overview" className="flex items-center gap-2.5" aria-label="Social Automations home">
@@ -101,12 +154,18 @@ export default function Layout() {
             <NavLink key={to} to={to} className="nav-item"><Icon aria-hidden="true" />{label}</NavLink>
           ))}
         </nav>
+        <div className="mt-auto"><UserMenu /></div>
       </aside>
 
       <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-line bg-surface/85 px-4 py-2.5 backdrop-blur-md lg:hidden">
         <Brand />
-        <div className="w-44"><ProjectSwitcher /></div>
+        <div className="flex items-center gap-2">
+          <div className="w-40"><ProjectSwitcher /></div>
+          <Link to="/settings" aria-label="Settings" className="btn btn-ghost btn-sm"><FaGear aria-hidden="true" /></Link>
+        </div>
       </header>
+
+      <VerifyBanner />
 
       {alerts.length > 0 && (
         <div className="mx-auto mt-5 max-w-5xl px-4 sm:px-8">

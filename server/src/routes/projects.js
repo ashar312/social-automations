@@ -44,7 +44,7 @@ function view(p, accounts = [], postCount = 0) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const where = req.query.archived === 'true' ? {} : { archived_at: null };
+    const where = req.query.archived === 'true' ? { user_id: req.user.id } : { user_id: req.user.id, archived_at: null };
     const projects = await Project.findAll({ where, order: [['name', 'ASC']] });
     const ids = projects.map((p) => p.id);
     const accounts = await PlatformAccount.findAll({ where: { project_id: ids } });
@@ -57,7 +57,7 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const d = parse(create, req.body);
-    const p = await Project.create({ name: d.name, color: d.color, icon: d.icon || null, description: d.description || null, settings: d.settings || null });
+    const p = await Project.create({ user_id: req.user.id, name: d.name, color: d.color, icon: d.icon || null, description: d.description || null, settings: d.settings || null });
     res.status(201).json({ ok: true, project: view(p) });
   } catch (e) { next(dupe(e)); }
 });
