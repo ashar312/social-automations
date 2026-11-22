@@ -14,8 +14,13 @@ const TICK_MS = 5000;
 const MAX_CONCURRENT = 2;
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MIN = [1, 5, 15];
+// An attempt with no progress/log activity for this long is abandoned (aborted) and retried, so a hung
+// connection can't hold a worker slot forever.
+const STALL_MS = 10 * 60 * 1000;
+const STALL_CHECK_MS = 15 * 1000;
 let running = 0;
 let timer = null;
+const active = new Set(); // target ids this process is publishing right now
 
 async function log(targetId, level, message, data) {
   try { await ActivityLog.create({ post_target_id: targetId, level, message: String(message).slice(0, 1000), data: data || null }); }
@@ -37,6 +42,20 @@ async function recover() {
   if (n) console.log(`Worker: reset ${n} interrupted job(s) to pending`);
 }
 
+// Periodic sweep: a target left in uploading/processing that this process isn't running (e.g. orphaned
+// by a crash) goes back to pending. Startup recover() handles the same case after a restart.
+async function recoverStuck() {
+  const cutoff = new Date(Date.now() - 2 * 60 * 1000);
+  const rows = await PostTarget.findAll({
+    where: { status: { [Op.in]: ['uploading', 'processing'] }, [Op.or]: [{ locked_at: null }, { locked_at: { [Op.lt]: cutoff } }] },
+  });
+  for (const t of rows.filter((r) => !active.has(r.id))) {
+    await PostTarget.update({ status: 'pending', locked_at: null, progress: 0 }, { where: { id: t.id, status: t.status } });
+    await log(t.id, 'warn', 'Found stuck in a previous attempt; put back in the queue');
+    await updatePostStatus(t.post_id);
+  }
+}
+
 async function claim(slots) {
   const now = new Date();
   const candidates = await PostTarget.findAll({
@@ -56,10 +75,15 @@ async function runTarget(t) {
   const post = t.post;
   const mediaRows = (await MediaFile.findAll({ where: { post_id: post.id }, order: [['position', 'ASC']] }));
   let lastProgress = -1;
+  let lastActivity = Date.now();
+  const abort = new AbortController();
   const ctx = {
     post, target: t, media: mediaRows, account: null,
-    log: (level, msg, data) => log(t.id, level, msg, data),
+    signal: abort.signal, // adapters pass this to long HTTP calls so an abandoned attempt really stops
+    touch: () => { lastActivity = Date.now(); }, // heartbeat for uploads that report no progress
+    log: (level, msg, data) => { lastActivity = Date.now(); return log(t.id, level, msg, data); },
     setProgress: (p) => {
+      lastActivity = Date.now();
       p = Math.max(0, Math.min(100, Math.round(p)));
       if (p === lastProgress) return;
       lastProgress = p;
@@ -67,6 +91,7 @@ async function runTarget(t) {
     },
     setStatus: (s) => PostTarget.update({ status: s }, { where: { id: t.id } }),
   };
+  let watchdog = null;
   try {
     await t.update({ status: 'uploading', started_at: t.started_at || new Date(), progress: 0 });
     await Post.update({ status: 'publishing' }, { where: { id: post.id } });
@@ -75,7 +100,17 @@ async function runTarget(t) {
     if (!accModel) throw new PublishError(`${t.platform} is not connected`, { reconnect: true });
     ctx.account = await ensureFresh(accModel);
     await log(t.id, 'info', `Publishing to ${t.platform} in project "${(await Project.findByPk(post.project_id))?.name}" (attempt ${t.attempts + 1})`);
-    const res = await adapters[t.platform].publish(ctx);
+    lastActivity = Date.now();
+    const stalled = new Promise((_, reject) => {
+      watchdog = setInterval(() => {
+        if (Date.now() - lastActivity < STALL_MS) return;
+        abort.abort();
+        reject(new PublishError(`No progress for ${Math.round(STALL_MS / 60000)} minutes; the attempt was abandoned`, { retryable: true }));
+      }, STALL_CHECK_MS);
+    });
+    const publishing = adapters[t.platform].publish(ctx);
+    publishing.catch(() => {}); // an abandoned attempt may still reject later; don't leave it unhandled
+    const res = await Promise.race([publishing, stalled]);
     await t.update({
       status: 'published', progress: 100, external_id: res.externalId, external_url: res.url,
       error_message: null, error_raw: null, locked_at: null, finished_at: new Date(),
@@ -101,6 +136,7 @@ async function runTarget(t) {
     }, { where: { id: t.id } });
     if (retry) await log(t.id, 'warn', `Will retry in ${BACKOFF_MIN[attempts - 1]} min`);
   } finally {
+    if (watchdog) clearInterval(watchdog);
     await updatePostStatus(post.id).catch((e) => console.error(e));
   }
 }
@@ -111,7 +147,8 @@ async function tick() {
     const jobs = await claim(MAX_CONCURRENT - running);
     for (const j of jobs) {
       running++;
-      runTarget(j).catch((e) => console.error('runTarget crashed', e)).finally(() => { running--; });
+      active.add(j.id);
+      runTarget(j).catch((e) => console.error('runTarget crashed', e)).finally(() => { running--; active.delete(j.id); });
     }
   } catch (e) { console.error('Worker tick failed:', e.message); }
 }
@@ -148,6 +185,7 @@ async function start() {
   timer = setInterval(tick, TICK_MS);
   tick();
   const safe = (fn) => () => fn().catch((e) => console.error(`${fn.name} failed:`, e.message));
+  setInterval(safe(recoverStuck), 5 * 60 * 1000);
   setInterval(safe(cleanupMedia), 6 * 3600 * 1000);
   setInterval(safe(tokenHealth), 12 * 3600 * 1000);
   setTimeout(safe(tokenHealth), 30 * 1000);

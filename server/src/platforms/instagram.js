@@ -43,7 +43,9 @@ async function resumableVideo(ctx, acc, mf, params) {
   const c = await post(`${GRAPH()}/${acc.externalId}/media`, acc, { ...params, media_type: 'REELS', upload_type: 'resumable' });
   await axios.post(c.uri, fs.createReadStream(absPath(mf)), {
     headers: { Authorization: `OAuth ${acc.accessToken}`, offset: '0', file_size: String(size), 'Content-Type': 'application/octet-stream', 'Content-Length': size },
-    maxBodyLength: Infinity, maxContentLength: Infinity,
+    // maxRedirects: 0 bypasses follow-redirects, which buffers the whole body in memory and fires all
+    // progress events up front, so the stall watchdog saw no activity during the real (slow) upload.
+    maxBodyLength: Infinity, maxContentLength: Infinity, maxRedirects: 0, signal: ctx.signal, onUploadProgress: () => ctx.touch(),
   });
   return c.id;
 }

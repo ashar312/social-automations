@@ -39,6 +39,7 @@ async function publish(ctx) {
   }, {
     onUploadProgress: (evt) => ctx.setProgress(Math.min(98, Math.round((evt.bytesRead / size) * 98))),
     maxBodyLength: Infinity,
+    signal: ctx.signal,
   });
   try {
     // Refresh an expired access token up front rather than mid-upload (a stale token made

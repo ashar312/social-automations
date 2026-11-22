@@ -34,7 +34,7 @@ async function chunkedVideo(ctx, acc, mf, caption, title) {
     const buf = await readRange(file, Number(start), Number(end));
     const f = form({ access_token: acc.accessToken, upload_phase: 'transfer', upload_session_id: s.upload_session_id, start_offset: String(start) });
     f.append('video_file_chunk', new Blob([buf]), 'chunk');
-    const { data } = await axios.post(base, f, { maxBodyLength: Infinity });
+    const { data } = await axios.post(base, f, { maxBodyLength: Infinity, signal: ctx.signal });
     start = data.start_offset; end = data.end_offset;
     ctx.setProgress(Math.min(95, Math.round((Number(start) / size) * 95)));
   }
@@ -52,7 +52,9 @@ async function reel(ctx, acc, mf, caption) {
   const videoId = s.video_id;
   await axios.post(s.upload_url || `${RUPLOAD()}/${videoId}`, fs.createReadStream(absPath(mf)), {
     headers: { Authorization: `OAuth ${acc.accessToken}`, offset: '0', file_size: String(size), 'Content-Type': 'application/octet-stream', 'Content-Length': size },
-    maxBodyLength: Infinity, maxContentLength: Infinity,
+    // maxRedirects: 0 bypasses follow-redirects, which buffers the whole body in memory and fires all
+    // progress events up front, so the stall watchdog saw no activity during the real (slow) upload.
+    maxBodyLength: Infinity, maxContentLength: Infinity, maxRedirects: 0, signal: ctx.signal, onUploadProgress: () => ctx.touch(),
   });
   ctx.setProgress(80);
   await axios.post(base, form({
