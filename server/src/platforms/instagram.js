@@ -1,9 +1,8 @@
 'use strict';
 const axios = require('axios');
-const fs = require('fs');
 const { GRAPH } = require('../services/tokens');
 const { fromHttp, PublishError } = require('../services/errors');
-const { textOf, videoOf, imagesOf, absPath, publicUrl, sleep } = require('./base');
+const { textOf, videoOf, imagesOf, absPath, publicUrl, sleep, ruploadFile } = require('./base');
 
 const post = (url, acc, params) =>
   axios.post(url, new URLSearchParams({ access_token: acc.accessToken, ...params })).then((r) => r.data);
@@ -39,14 +38,8 @@ async function checkQuota(ctx, acc) {
 }
 
 async function resumableVideo(ctx, acc, mf, params) {
-  const size = Number(mf.size_bytes);
   const c = await post(`${GRAPH()}/${acc.externalId}/media`, acc, { ...params, media_type: 'REELS', upload_type: 'resumable' });
-  await axios.post(c.uri, fs.createReadStream(absPath(mf)), {
-    headers: { Authorization: `OAuth ${acc.accessToken}`, offset: '0', file_size: String(size), 'Content-Type': 'application/octet-stream', 'Content-Length': size },
-    // maxRedirects: 0 bypasses follow-redirects, which buffers the whole body in memory and fires all
-    // progress events up front, so the stall watchdog saw no activity during the real (slow) upload.
-    maxBodyLength: Infinity, maxContentLength: Infinity, maxRedirects: 0, signal: ctx.signal, onUploadProgress: () => ctx.touch(),
-  });
+  await ruploadFile(ctx, c.uri, absPath(mf), { Authorization: `OAuth ${acc.accessToken}` });
   return c.id;
 }
 

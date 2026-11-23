@@ -4,7 +4,7 @@ const fs = require('fs');
 const { GRAPH } = require('../services/tokens');
 const env = require('../config/env');
 const { fromHttp, PublishError } = require('../services/errors');
-const { textOf, videoOf, imagesOf, absPath, readRange, sleep } = require('./base');
+const { textOf, videoOf, imagesOf, absPath, readRange, sleep, ruploadFile } = require('./base');
 
 const VIDEO_GRAPH = () => `https://graph-video.facebook.com/${env.META_GRAPH_VERSION}`;
 const RUPLOAD = () => `https://rupload.facebook.com/video-upload/${env.META_GRAPH_VERSION}`;
@@ -46,16 +46,10 @@ async function chunkedVideo(ctx, acc, mf, caption, title) {
 }
 
 async function reel(ctx, acc, mf, caption) {
-  const size = Number(mf.size_bytes);
   const base = `${GRAPH()}/${acc.externalId}/video_reels`;
   const { data: s } = await axios.post(base, form({ access_token: acc.accessToken, upload_phase: 'start' }));
   const videoId = s.video_id;
-  await axios.post(s.upload_url || `${RUPLOAD()}/${videoId}`, fs.createReadStream(absPath(mf)), {
-    headers: { Authorization: `OAuth ${acc.accessToken}`, offset: '0', file_size: String(size), 'Content-Type': 'application/octet-stream', 'Content-Length': size },
-    // maxRedirects: 0 bypasses follow-redirects, which buffers the whole body in memory and fires all
-    // progress events up front, so the stall watchdog saw no activity during the real (slow) upload.
-    maxBodyLength: Infinity, maxContentLength: Infinity, maxRedirects: 0, signal: ctx.signal, onUploadProgress: () => ctx.touch(),
-  });
+  await ruploadFile(ctx, s.upload_url || `${RUPLOAD()}/${videoId}`, absPath(mf), { Authorization: `OAuth ${acc.accessToken}` });
   ctx.setProgress(80);
   await axios.post(base, form({
     access_token: acc.accessToken, upload_phase: 'finish', video_id: videoId, video_state: 'PUBLISHED', description: caption,
