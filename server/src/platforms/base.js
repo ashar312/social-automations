@@ -45,13 +45,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * 'data' event here means bytes actually went to the socket.
  * Errors mimic axios ({ response: { status, data } }) so fromHttp() handles them unchanged.
  */
-function ruploadFile(ctx, url, file, headers) {
+function ruploadOnce(ctx, url, file, headers, size, start) {
   const https = require('https');
-  const size = fs.statSync(file).size;
   return new Promise((resolve, reject) => {
     const req = https.request(url, {
       method: 'POST',
-      headers: { ...headers, offset: '0', file_size: String(size), 'Content-Type': 'application/octet-stream', 'Content-Length': size },
+      headers: { ...headers, offset: String(start), file_size: String(size), 'Content-Type': 'application/octet-stream', 'Content-Length': size - start },
       signal: ctx.signal,
     }, (res) => {
       let body = '';
@@ -68,11 +67,50 @@ function ruploadFile(ctx, url, file, headers) {
       res.on('error', reject);
     });
     req.on('error', reject);
-    const stream = fs.createReadStream(file);
+    const stream = fs.createReadStream(file, { start });
     stream.on('data', () => ctx.touch());
     stream.on('error', (e) => { req.destroy(e); reject(e); });
     stream.pipe(req);
   });
+}
+
+/** Bytes the rupload session already holds (GET on the same URL answers { offset }); 0 if unknown. */
+async function ruploadOffset(url, headers) {
+  try {
+    const { data } = await require('axios').get(url, { headers: { Authorization: headers.Authorization } });
+    const n = Number(data && data.offset);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch { return 0; }
+}
+
+// rupload sometimes drops a good upload with 400 ProcessingFailedError (debug_info says retriable:false, but
+// re-sending into the same session succeeds), and connections can reset. Those get resumed; anything else is final.
+function ruploadRetriable(e) {
+  if (e.name === 'AbortError') return false;
+  const r = e.response;
+  if (!r) return true; // network error
+  if (r.status >= 500) return true;
+  return r.status === 400 && r.data && r.data.debug_info && r.data.debug_info.type === 'ProcessingFailedError';
+}
+
+/**
+ * Upload a file to a Meta rupload session, resuming from the offset Meta reports if an attempt is dropped.
+ */
+async function ruploadFile(ctx, url, file, headers, { attempts = 5 } = {}) {
+  const size = fs.statSync(file).size;
+  let start = 0;
+  for (let i = 1; ; i++) {
+    try {
+      return await ruploadOnce(ctx, url, file, headers, size, start);
+    } catch (e) {
+      if (ctx.signal.aborted || i >= attempts || !ruploadRetriable(e)) throw e;
+      const why = e.response ? `HTTP ${e.response.status} ${e.response.data?.debug_info?.type || ''}`.trim() : e.message;
+      if (ctx.log) ctx.log('warn', `Upload attempt ${i}/${attempts} was dropped by Meta (${why}); retrying`, e.response?.data);
+      await sleep(2000 * i);
+      start = await ruploadOffset(url, headers);
+      if (start >= size) return { success: true, resumed: true };
+    }
+  }
 }
 
 module.exports = { textOf, videoOf, imagesOf, documentOf, absPath, publicUrl, readRange, sleep, ruploadFile };

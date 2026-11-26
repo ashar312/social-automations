@@ -14,7 +14,10 @@ function fromHttp(err, prefix = '') {
   const res = err.response;
   const status = res && res.status;
   const data = res && res.data;
-  let msg = (data && (data.error?.message || data.error_description || data.message || (typeof data.error === 'string' && data.error))) || err.message;
+  // Meta's rupload hosts answer with { debug_info: { type, message } } instead of Graph's { error: { message } }.
+  const dbg = data && data.debug_info;
+  const dbgMsg = dbg && dbg.message && `${dbg.message}${dbg.type ? ` (${dbg.type})` : ''}`;
+  let msg = (data && (data.error?.message || data.error_description || data.message || dbgMsg || (typeof data.error === 'string' && data.error))) || err.message;
   if (typeof msg !== 'string') msg = JSON.stringify(msg);
   const code = data && data.error && data.error.code;
   const reconnect = status === 401 || code === 190;
